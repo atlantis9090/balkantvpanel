@@ -465,14 +465,23 @@
                         <div class="p-4 border-t space-y-3">
                             <input type="text" id="singleUsername" placeholder="Kullanıcı Adı" class="w-full px-3 py-1.5 border rounded-lg text-sm">
                             <input type="password" id="singlePassword" placeholder="Şifre" class="w-full px-3 py-1.5 border rounded-lg text-sm">
-                            <input type="text" id="singleExpiryDate" placeholder="Bitiş Tarihi (YYYY-MM-DD)" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                            <input type="date" id="singleExpiryDate" placeholder="Bitiş Tarihi (YYYY-MM-DD)" class="w-full px-3 py-1.5 border rounded-lg text-sm">
                             <input type="email" id="singleEmail" placeholder="E-posta Adresi (İsteğe bağlı)" class="w-full px-3 py-1.5 border rounded-lg text-sm">
                             <select id="singleUserType" class="w-full px-3 py-1.5 border rounded-lg text-sm">
                                 <option value="YURTICI">Yurtiçi</option>
                                 <option value="YURTDISI">Yurtdışı</option>
                             </select>
-                            <input type="text" id="singleAccountType" placeholder="Kullanıcı Tipi (Örn: Premium)" class="w-full px-3 py-1.5 border rounded-lg text-sm">
-                            <input type="text" id="singleSubscriptionPeriod" placeholder="Üyelik Süresi (Örn: 6 Ay)" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                            <select id="singleAccountType" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                                <option value="Normal">Normal</option>
+                                <option value="Admin">Admin</option>
+                                <option value="Premium">Premium</option>
+                            </select>
+                            <select id="singleSubscriptionPeriod" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                                <option value="3 Ay">3 Ay</option>
+                                <option value="6 Ay">6 Ay</option>
+                                <option value="12 Ay">12 Ay</option>
+                            </select>
+                            <textarea id="singleDescription" placeholder="Açıklama (İsteğe bağlı)" class="w-full px-3 py-1.5 border rounded-lg text-sm" rows="3"></textarea>
                             <button id="singleAddUserButton" class="w-full py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-semibold transition-colors">
                                 Yeni Kullanıcıyı Kaydet
                             </button>
@@ -805,6 +814,7 @@
         const singleUserTypeSelect = document.getElementById('singleUserType');
         const singleAccountTypeInput = document.getElementById('singleAccountType');
         const singleSubscriptionPeriodInput = document.getElementById('singleSubscriptionPeriod');
+        const singleDescription = document.getElementById('singleDescription');
 
         // Kullanıcı Düzenleme/Silme (YENİ)
         const editUserSelect = document.getElementById('editUserSelect');
@@ -1683,6 +1693,7 @@
             const userType = singleUserTypeSelect.value;
             const accountType = singleAccountTypeInput.value.trim();
             const subscriptionPeriod = singleSubscriptionPeriodInput.value.trim();
+            const description = singleDescription.value.trim();
 
             if (!username || !password || !expiryDate || !userType || !accountType || !subscriptionPeriod) {
                 showMessage("Lütfen zorunlu tüm alanları doldurun (Kullanıcı Adı, Şifre, Bitiş Tarihi, Tip, Süre, Kullanım Alanı).", 'error');
@@ -1702,7 +1713,8 @@
                     accountType: accountType,
                     subscriptionPeriod: subscriptionPeriod,
                     userType: userType,
-                    email: email, 
+                    email: email,
+                    description: description,
                     lastLoginDate: new Date().toISOString(), 
                     lastUpdate: new Date().toISOString()
                 };
@@ -1715,8 +1727,9 @@
                 singlePasswordInput.value = '';
                 singleExpiryDateInput.value = '';
                 singleEmailInput.value = '';
-                singleAccountTypeInput.value = '';
-                singleSubscriptionPeriodInput.value = '';
+                singleAccountTypeInput.value = 'Normal';
+                singleSubscriptionPeriodInput.value = '3 Ay';
+                singleDescription.value = '';
 
                 fetchAllUsers(); // Listeyi ve metrikleri yenile
                 
