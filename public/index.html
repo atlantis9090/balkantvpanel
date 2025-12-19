@@ -669,6 +669,7 @@
 
     <!-- Flatpickr JS -->
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/tr.js"></script>
 
     <!-- Firebase Script -->
     <script type="module">
@@ -2622,6 +2623,7 @@
         flatpickr("#singleExpiryDate, #editExpiryDate, #modalExpiryDate", {
             dateFormat: "Y-m-d",
             allowInput: true,
+            locale: "tr",
         });
 
         document.addEventListener('DOMContentLoaded', () => {
