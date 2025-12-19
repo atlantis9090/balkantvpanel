@@ -1,0 +1,2603 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPTV Kullanıcı Bilgi Paneli</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- QR Code Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #fef3e3; /* Açık Turuncu-Beyaz Arka Plan */
+        }
+        .main-card {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            transition: all 0.3s ease-in-out;
+        }
+        .admin-toggle-icon {
+            transition: transform 0.3s;
+        }
+        /* Yönetici ve Kullanıcı Görünümleri */
+        .admin-view, .user-view, .user-panel-view, #newAccountRequestContainer {
+            display: none;
+        }
+        #loginFormContainer.hidden {
+             display: none;
+        }
+        .user-row:hover {
+            background-color: #fef8f4;
+        }
+        .metric-card {
+            transition: transform 0.2s;
+        }
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        /* Turuncu Renk Paleti */
+        .color-primary { background-color: #f97316; } /* Orange 600 */
+        .color-secondary { background-color: #fb923c; } /* Orange 400 */
+        .text-primary { color: #f97316; }
+        .border-primary { border-color: #f97316; }
+
+        /* Modal Stilleri */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white;
+            padding: 24px;
+            border-radius: 1rem;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-10 px-4">
+
+    <!-- Ana Başlık ve Uygulama Alanı -->
+    <div class="w-full max-w-2xl bg-white main-card rounded-3xl p-4 sm:p-8 transform hover:shadow-xl transition-all duration-300">
+        <h1 class="text-3xl sm:text-4xl font-extrabold text-center text-orange-700 mb-2">
+            BALKAN IPTV Müşteri Merkezi
+        </h1>
+        <p class="text-center text-gray-500 mb-8">
+            Güncel bağlantı URL'nizi ve abonelik detaylarınızı kontrol edin.
+        </p>
+        
+        <!-- Kimlik Doğrulama Durumu (Debug Amaçlı) -->
+        <div id="authStatus" class="text-xs sm:text-sm text-center mb-4 p-2 rounded-xl bg-orange-100 text-orange-700 font-medium hidden">
+            Sistem Bağlantısı Kuruluyor...
+        </div>
+
+        <!-- Müşteri/Admin Giriş Formu (Ortak) -->
+        <div id="loginFormContainer" class="space-y-4 mb-8 p-4 sm:p-6 border border-gray-100 rounded-xl bg-white shadow-inner">
+            <h2 class="text-xl sm:text-2xl font-bold text-gray-700 flex items-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 mr-2 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
+                Oturum Aç
+            </h2>
+            <label for="iptvUsernameInput" class="block text-sm font-medium text-gray-700">Kullanıcı Adı:</label>
+            <input type="text" id="iptvUsernameInput" placeholder="Kullanıcı adınızı buraya girin..."
+                           class="w-full px-4 py-2 border border-orange-200 rounded-lg focus:ring-orange-500 focus:border-orange-500 transition-shadow">
+            
+            <label for="iptvPasswordInput" class="block text-sm font-medium text-gray-700">Şifre:</label>
+            <input type="password" id="iptvPasswordInput" placeholder="Şifrenizi buraya girin..."
+                           class="w-full px-4 py-2 border border-orange-200 rounded-lg focus:ring-orange-500 focus:border-orange-500 transition-shadow">
+                           
+            <button id="loginButton"
+                            class="w-full flex justify-center py-3 px-4 rounded-xl shadow-lg text-lg font-bold text-white bg-orange-600 hover:bg-orange-700 transition-all duration-300 transform hover:scale-[1.01]"
+                            disabled>
+                Giriş Yap
+            </button>
+            
+            <!-- HESAP OLUŞTURMA BUTONU -->
+            <button id="showNewAccountFormButton"
+                            class="w-full flex justify-center py-2 px-4 rounded-xl text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 mt-3 transition-colors">
+                Üye Değil misiniz? Hesap Oluşturma Talebi
+            </button>
+        </div>
+        
+        <!-- YENİ HESAP OLUŞTURMA TALEBİ FORMU -->
+        <div id="newAccountRequestContainer" class="space-y-4 mb-8 p-4 sm:p-6 border border-orange-300 rounded-xl bg-orange-50 shadow-inner">
+            <h2 class="text-xl sm:text-2xl font-bold text-orange-700 flex items-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 mr-2 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="18" y1="8" x2="18" y2="10"></line><line x1="18" y1="14" x2="18" y2="16"></line></svg>
+                Yeni Hesap Talebi
+            </h2>
+            <p class="text-sm text-gray-600">Lütfen yöneticinin size dönüş yapabilmesi için bilgilerinizi eksiksiz doldurunuz.</p>
+            
+            <label for="newAccountPhoneInput" class="block text-sm font-medium text-gray-700">Telefon Numaranız:</label>
+            <input type="tel" id="newAccountPhoneInput" placeholder="Örn: 5xx xxx xx xx"
+                           class="w-full px-4 py-2 border border-orange-300 rounded-lg focus:ring-orange-500 focus:border-orange-500 transition-shadow">
+
+            <label for="newAccountEmailInput" class="block text-sm font-medium text-gray-700">E-posta Adresiniz:</label>
+            <input type="email" id="newAccountEmailInput" placeholder="E-posta adresinizi girin..."
+                           class="w-full px-4 py-2 border border-orange-300 rounded-lg focus:ring-orange-500 focus:border-orange-500 transition-shadow">
+            
+            <label for="newAccountDurationSelect" class="block text-sm font-medium text-gray-700">İstenen Üyelik Süresi:</label>
+            <select id="newAccountDurationSelect"
+                            class="w-full px-4 py-2 border border-orange-300 rounded-lg focus:ring-orange-500 focus:border-orange-500 transition-shadow">
+                <option value="" disabled selected>-- Süre Seçin --</option>
+                <option value="3 Ay">3 Ay</option>
+                <option value="6 Ay">6 Ay</option>
+                <option value="12 Ay">12 Ay</option>
+            </select>
+            
+            <label for="newAccountTypeSelect" class="block text-sm font-medium text-gray-700">Kullanım Alanı:</label>
+            <select id="newAccountTypeSelect"
+                            class="w-full px-4 py-2 border border-orange-300 rounded-lg focus:ring-orange-500 focus:border-orange-500 transition-shadow">
+                <option value="" disabled selected>-- Yurtiçi mi, Yurtdışı mı? --</option>
+                <option value="YURTICI">Yurtiçi</option>
+                <option value="YURTDISI">Yurtdışı</option>
+            </select>
+
+            <button id="submitNewAccountRequestButton"
+                            class="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold transition-colors shadow-lg">
+                Hesap Oluşturma Talebini Gönder
+            </button>
+            <button id="hideNewAccountFormButton"
+                            class="w-full py-2 text-sm font-medium text-gray-600 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors mt-3">
+                Giriş Ekranına Geri Dön
+            </button>
+        </div>
+        
+        <!-- Müşteri (User) GÖRÜNÜMÜ -->
+        <div id="userView" class="user-view">
+            <!-- Header ve Çıkış Butonu -->
+            <div class="flex justify-between items-center mb-6 border-b pb-4">
+                <h3 id="userWelcomeHeader" class="text-xl sm:text-2xl font-bold text-orange-700">Hoş Geldiniz!</h3>
+                <button id="userLogoutButton" class="py-1 px-4 bg-gray-400 hover:bg-gray-500 text-white rounded-lg text-sm transition-colors shadow-md">
+                    Çıkış Yap
+                </button>
+            </div>
+
+            <!-- MÜŞTERİ MENÜSÜ (GÜNCELLENDİ) -->
+            <nav class="flex flex-wrap space-x-1 border-b pb-2 mb-6">
+                <button id="navUserInfo" onclick="showUserView('info')" class="py-2 px-4 text-sm font-semibold rounded-t-lg bg-orange-600 text-white transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 00-4-4H9a4 4 0 00-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                    Hesap Bilgilerim
+                </button>
+                <button id="navUserRenewal" onclick="showUserView('renewal')" class="py-2 px-4 text-sm font-semibold rounded-t-lg text-orange-600 hover:bg-orange-100 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6m6 0l-7 7-3-3m-7 7l3 3m0-3l7-7m-7 7V16a5 5 0 015-5h2a5 5 0 015 5v2"></path></svg>
+                    Üyelik Uzatma
+                </button>
+                <!-- YENİ: FİYAT LİSTESİ -->
+                <button id="navPriceList" onclick="showUserView('priceList')" class="py-2 px-4 text-sm font-semibold rounded-t-lg text-orange-600 hover:bg-orange-100 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"></path></svg>
+                    Fiyat Listesi
+                </button>
+                <button id="navUserMessages" onclick="showUserView('messages')" class="py-2 px-4 text-sm font-semibold rounded-t-lg text-orange-600 hover:bg-orange-100 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                    Mesajlar
+                </button>
+            </nav>
+            
+            <!-- 1. HESAP BİLGİLERİM GÖRÜNÜMÜ -->
+            <div id="userInfoView" class="user-panel-view"> 
+                <div id="resultContainer" class="mt-8 p-4 sm:p-6 border border-green-200 rounded-xl bg-green-50 shadow-lg">
+                    <h2 class="text-xl sm:text-2xl font-bold text-green-700 border-b-2 border-green-300 pb-3 mb-4 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                        Güncel Abonelik Bilgileri
+                    </h2>
+                    <div id="userDataDisplay" class="space-y-4">
+                        <!-- Veriler buraya yüklenecek -->
+                    </div>
+
+                    <div class="mt-6 p-4 bg-yellow-100 border-l-4 border-yellow-500 rounded-lg text-sm text-yellow-800">
+                        <p class="font-bold">⚠️ Yeni Bağlantı Uyarısı:</p>
+                        <p>Yeni URL'niz aktif edilmiştir. Oynatıcınıza kopyalayıp yapıştırınız. Sorun yaşarsanız lütfen yöneticinizle iletişime geçin.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. ÜYELİK UZATMA GÖRÜNÜMÜ -->
+            <div id="userRenewalView" class="user-panel-view hidden">
+                <div id="renewalFormContainer" class="mt-8 p-4 sm:p-6 bg-orange-100 border border-orange-300 rounded-xl space-y-4 shadow-md">
+                    <h3 class="text-lg sm:text-xl font-bold text-orange-700 flex items-center border-b pb-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10l3 3m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Yeni Üyelik Uzatma Talebi
+                    </h3>
+                    
+                    <label for="renewalDuration" class="block text-sm font-medium text-gray-700">Uzatma Süresi Seçiniz:</label>
+                    <select id="renewalDuration"
+                                 class="w-full px-4 py-2 border border-orange-300 rounded-lg focus:ring-orange-500 focus:border-orange-500 transition-shadow">
+                        <option value="" disabled selected>-- Süre Seçin --</option>
+                        <option value="3 Ay">3 Ay</option>
+                        <option value="6 Ay">6 Ay</option>
+                        <option value="12 Ay">12 Ay</option>
+                    </select>
+
+                    <label for="renewalUserTypeSelect" class="block text-sm font-medium text-gray-700">Üyelik Tipi Onayı (Gerekli):</label>
+                    <select id="renewalUserTypeSelect"
+                                 class="w-full px-4 py-2 border border-orange-300 rounded-lg focus:ring-orange-500 focus:border-orange-500 transition-shadow">
+                        <option value="" disabled selected>-- Mevcut Tipi Onaylayın --</option>
+                        <option value="YURTICI">Yurtiçi</option>
+                        <option value="YURTDISI">Yurtdışı</option>
+                    </select>
+
+                    <label for="phoneNumberInput" class="block text-sm font-medium text-gray-700">Telefon Numaranız (İletişim için):</label>
+                    <input type="tel" id="phoneNumberInput" placeholder="Örn: 5xx xxx xx xx"
+                                 class="w-full px-4 py-2 border border-orange-300 rounded-lg focus:ring-orange-500 focus:border-orange-500 transition-shadow">
+
+                    <button id="sendRenewalRequestButton"
+                                 class="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold transition-colors disabled:opacity-50 shadow-lg">
+                        Uzatma Talebini Gönder
+                    </button>
+                    <p class="text-xs text-center text-orange-800 pt-2">Talebiniz bize ulaştıktan sonra size geri dönüş yapılacaktır.</p>
+                </div>
+            </div>
+
+            <!-- 3. FİYAT LİSTESİ GÖRÜNÜMÜ (YENİ) -->
+            <div id="userPriceListView" class="user-panel-view hidden">
+                <div class="mt-8 p-4 sm:p-6 bg-orange-100 border border-orange-300 rounded-xl shadow-md">
+                    <h3 class="text-lg sm:text-xl font-bold text-orange-700 border-b pb-2 mb-4 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"></path></svg>
+                        Güncel Abonelik Fiyat Listesi
+                    </h3>
+                    <div id="priceListDisplay" class="space-y-4">
+                        <p class="text-center text-gray-500">Fiyatlar yükleniyor...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. MESAJLAR GÖRÜNÜMÜ (YENİ) -->
+            <div id="userMessagesView" class="user-panel-view hidden">
+                <div class="mt-8 p-4 sm:p-6 bg-blue-50 border border-blue-200 rounded-xl shadow-md">
+                    <h3 class="text-lg sm:text-xl font-bold text-blue-700 border-b pb-2 mb-4 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                        Yönetici Mesajları
+                    </h3>
+                    <div id="userMessagesContainer" class="space-y-3 max-h-96 overflow-y-auto p-1">
+                        <!-- Mesajlar buraya gelecek -->
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+        
+        <!-- YÖNETİCİ (Admin) GÖRÜNÜMÜ -->
+        <div id="adminView" class="admin-view mt-12 border-t pt-8">
+            <h3 class="text-xl sm:text-2xl font-bold text-orange-700 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between">
+                <span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 mr-2 inline-block text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path></svg>
+                    Yönetici Kontrol Merkezi
+                </span>
+                <button id="adminLogoutButton" class="py-1 px-4 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm transition-colors">
+                    Çıkış Yap
+                </button>
+            </h3>
+
+            <!-- YÖNETİCİ MENÜSÜ -->
+            <nav class="flex flex-wrap space-x-1 border-b pb-2 mb-6">
+                <button id="navDashboard" onclick="showAdminView('dashboard')" class="py-2 px-4 text-sm font-semibold rounded-t-lg bg-orange-600 text-white transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+                    Dashboard
+                </button>
+                <button id="navRegisteredUsers" onclick="showAdminView('registeredUsers')" class="py-2 px-4 text-sm font-semibold rounded-t-lg text-orange-600 hover:bg-orange-100 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 00-3-3.87"></path><path d="M16 3.13a4 4 0 010 7.75"></path></svg>
+                    Kullanıcılar
+                </button>
+                <button id="navUserManagement" onclick="showAdminView('managementTools')" class="py-2 px-4 text-sm font-semibold rounded-t-lg text-orange-600 hover:bg-orange-100 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><path d="M18 8a2 2 0 100 4 2 2 0 000-4z"></path><path d="M10 21v-2a4 4 0 014-4h2"></path></svg>
+                    Yönetim Araçları
+                </button>
+                <!-- YENİ: İÇERİK YÖNETİMİ MENÜSÜ -->
+                <details class="relative">
+                    <summary class="py-2 px-4 text-sm font-semibold rounded-t-lg text-orange-600 hover:bg-orange-100 transition-colors cursor-pointer flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"></path></svg>
+                        İçerik Yönetimi
+                    </summary>
+                    <div class="absolute top-full left-0 bg-white border rounded-b-lg shadow-lg z-10 w-48">
+                        <button id="navPriceManagement" onclick="showAdminView('priceManagement')" class="w-full text-left py-2 px-4 text-sm text-gray-700 hover:bg-gray-100">Fiyat Listesi</button>
+                        <button id="navMessages" onclick="showAdminView('messages')" class="w-full text-left py-2 px-4 text-sm text-gray-700 hover:bg-gray-100">Mesajlar</button>
+                    </div>
+                </details>
+            </nav>
+
+            <div id="adminContent" class="bg-gray-100 p-2 sm:p-6 rounded-2xl space-y-6 shadow-inner">
+                
+                <!-- 1. DASHBOARD GÖRÜNÜMÜ -->
+                <div id="adminDashboardView" class="admin-panel-view space-y-6">
+                    
+                    <h4 class="font-bold text-gray-700 text-xl border-b pb-2 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                        Genel Metrikler
+                    </h4>
+
+                    <!-- METRİK KARTLARI -->
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+                        <div class="metric-card p-3 rounded-xl bg-green-500 text-white text-center shadow-md">
+                            <div id="metricActiveUsers" class="text-2xl font-bold">0</div>
+                            <div class="text-xs font-medium mt-1">Aktif Kullanıcı</div>
+                        </div>
+                        <div class="metric-card p-3 rounded-xl bg-yellow-500 text-white text-center shadow-md">
+                            <div id="metricExpiringSoon" class="text-2xl font-bold">0</div>
+                            <div class="text-xs font-medium mt-1">30 Gün İçinde Bitecek</div>
+                        </div>
+                        <div class="metric-card p-3 rounded-xl bg-red-500 text-white text-center shadow-md">
+                            <div id="metricExpired" class="text-2xl font-bold">0</div>
+                            <div class="text-xs font-medium mt-1">Süresi Bitenler</div>
+                        </div>
+                        <div class="metric-card p-3 rounded-xl bg-purple-500 text-white text-center shadow-md">
+                            <div id="metricRenewalRequests" class="text-2xl font-bold">0</div>
+                            <div class="text-xs font-medium mt-1">Bekleyen Uzatma</div>
+                        </div>
+                        <div class="metric-card p-3 rounded-xl bg-orange-500 text-white text-center shadow-md">
+                            <div id="metricNewAccountRequests" class="text-2xl font-bold">0</div>
+                            <div class="text-xs font-medium mt-1">Yeni Hesap Talebi</div>
+                        </div>
+                        <div class="metric-card p-3 rounded-xl bg-blue-500 text-white text-center shadow-md">
+                            <div id="metricNewUsersLast7Days" class="text-2xl font-bold">0</div>
+                            <div class="text-xs font-medium mt-1">Son 7 Gün Yeni Kullanıcı</div>
+                        </div>
+                    </div>
+
+                    <!-- Merkezi URL Yönetimi Alanı -->
+                    <div class="border p-4 rounded-xl bg-white space-y-3 shadow-md">
+                        <h4 class="font-bold text-gray-700 text-lg border-b pb-2 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"></path></svg>
+                            1. Merkezi URL Yönetimi (Yurtiçi & Yurtdışı)
+                        </h4>
+                        
+                        <!-- YURTİÇİ -->
+                        <div class="border p-3 rounded-lg bg-gray-50 space-y-2">
+                            <label for="globalDomesticUrlInput" class="block text-sm font-bold text-gray-700">Yurtiçi URL:</label>
+                            <input type="url" id="globalDomesticUrlInput" placeholder="Yurtiçi Bağlantı (Örn: https://dom.link)" 
+                                        class="w-full px-3 py-2 border border-red-300 rounded-lg text-sm focus:border-red-500 focus:ring-red-500">
+                            <button id="updateDomesticUrlButton" class="w-full py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-semibold transition-colors">
+                                Yurtiçi URL'yi Güncelle
+                            </button>
+                        </div>
+                        
+                        <!-- YURTDIŞI -->
+                        <div class="border p-3 rounded-lg bg-gray-50 space-y-2">
+                            <label for="globalInternationalUrlInput" class="block text-sm font-bold text-gray-700">Yurtdışı URL:</label>
+                            <input type="url" id="globalInternationalUrlInput" placeholder="Yurtdışı Bağlantı (Örn: https://int.link)" 
+                                        class="w-full px-3 py-2 border border-red-300 rounded-lg text-sm focus:border-red-500 focus:ring-red-500">
+                            <button id="updateInternationalUrlButton" class="w-full py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-semibold transition-colors">
+                                Yurtdışı URL'yi Güncelle
+                            </button>
+                        </div>
+
+                        <div id="currentGlobalUrl" class="text-sm text-center p-2 rounded-lg bg-gray-100 font-mono break-all">Mevcut URL'ler yükleniyor...</div>
+                    </div>
+                    
+                    <!-- Hesap Uzatma Talepleri Alanı (Şimdi 2.) -->
+                    <div class="border p-4 rounded-xl bg-white space-y-3 shadow-md">
+                        <h4 class="font-bold text-gray-700 text-lg border-b pb-2 flex items-center justify-between">
+                            <span class="flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10l3 3m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                2. Mevcut Üyelik Uzatma Talepleri
+                            </span>
+                            <span id="requestCount" class="text-xs bg-purple-500 text-white px-2 py-1 rounded-full">0 Yeni</span>
+                        </h4>
+                        <button id="refreshRequestsButton" class="py-1 px-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs transition-colors">
+                            Talepleri Yenile
+                        </button>
+                        <div id="renewalRequestsList" class="max-h-80 overflow-y-auto mt-3 border rounded-lg bg-gray-50">
+                            <p class="text-center p-4 text-gray-500" id="requestStatus">Talepleri görüntülemek için Yenile'ye tıklayın.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Yeni Hesap Oluşturma Talepleri Alanı (Şimdi 3.) -->
+                    <div class="border p-4 rounded-xl bg-white space-y-3 shadow-md">
+                        <h4 class="font-bold text-gray-700 text-lg border-b pb-2 flex items-center justify-between">
+                            <span class="flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="18" y1="8" x2="18" y2="16"></line><line x1="22" y1="12" x2="14" y2="12"></line></svg>
+                                3. Yeni Hesap Oluşturma Talepleri
+                            </span>
+                            <span id="newAccountRequestCount" class="text-xs bg-orange-500 text-white px-2 py-1 rounded-full">0 Yeni</span>
+                        </h4>
+                        <button id="refreshNewAccountRequestsButton" class="py-1 px-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs transition-colors">
+                            Talepleri Yenile
+                        </button>
+                        <div id="newAccountRequestsList" class="max-h-80 overflow-y-auto mt-3 border rounded-lg bg-gray-50">
+                            <p class="text-center p-4 text-gray-500" id="newAccountRequestStatus">Talepleri görüntülemek için Yenile'ye tıklayın.</p>
+                        </div>
+                    </div>
+
+                </div>
+                <!-- DASHBOARD GÖRÜNÜMÜ BİTİŞ -->
+                
+                <!-- 2. KAYITLI KULLANICILAR GÖRÜNÜMÜ -->
+                <div id="adminRegisteredUsersView" class="admin-panel-view hidden space-y-6">
+                    <!-- Kullanıcı Listeleme Alanı -->
+                    <div class="border p-4 rounded-xl bg-white space-y-3 shadow-md">
+                        <h4 class="font-bold text-gray-700 text-lg border-b pb-2 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"></line><line x1="18" y1="20" x2="18" y2="4"></line><line x1="6" y1="20" x2="6" y2="16"></line></svg>
+                            Kayıtlı Kullanıcılar (Toplam: <span id="userCount">0</span>)
+                        </h4>
+                        
+                        <div class="flex space-x-2">
+                            <input type="text" id="userSearchInput" placeholder="Kullanıcı adına göre ara..."
+                                 class="flex-grow px-3 py-1 border rounded-lg text-sm">
+                            <button id="refreshUserListButton" class="py-1 px-3 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors">
+                                Listeyi Yenile
+                            </button>
+                        </div>
+
+                        <div id="userListContainer" class="max-h-96 overflow-y-auto mt-3 border rounded-lg bg-gray-50 relative">
+                            <div class="sticky top-0 bg-gray-200 p-2 font-semibold text-xs text-gray-700 hidden sm:flex justify-between">
+                                <span class="w-1/4">Kullanıcı Adı / Şifre</span>
+                                <span class="w-1/5 text-center">Tip</span>
+                                <span class="w-1/4 text-center">Bitiş Tarihi</span>
+                                <span class="w-1/6 text-center">Durum</span>
+                                <span class="w-1/6 text-right">İşlemler</span>
+                            </div>
+                            <div id="userListContent">
+                                <p class="text-center p-4 text-gray-500" id="listStatus">Listeyi görüntülemek için Yenile'ye tıklayın.</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Pagination Kontrolleri -->
+                        <div id="paginationControls" class="flex justify-center items-center space-x-4 mt-4 p-2">
+                            <!-- Butonlar buraya eklenecek -->
+                        </div>
+                    </div>
+                </div>
+                <!-- KAYITLI KULLANICILAR GÖRÜNÜMÜ BİTİŞ -->
+
+
+                <!-- 3. YÖNETİM ARAÇLARI GÖRÜNÜMÜ -->
+                <div id="adminUserManagementView" class="admin-panel-view hidden space-y-6">
+
+                    <!-- 1. KULLANICI EKLEME (AKORDİYON) -->
+                    <details class="group border rounded-xl bg-white shadow-md overflow-hidden">
+                        <summary class="p-4 font-bold text-gray-700 text-lg flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors">
+                            <span>1. Yeni Kullanıcı Ekle</span>
+                            <svg class="w-5 h-5 transform group-open:rotate-180 transition-transform" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                        </summary>
+                        <div class="p-4 border-t space-y-3">
+                            <input type="text" id="singleUsername" placeholder="Kullanıcı Adı" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                            <input type="password" id="singlePassword" placeholder="Şifre" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                            <input type="text" id="singleExpiryDate" placeholder="Bitiş Tarihi (YYYY-MM-DD)" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                            <input type="email" id="singleEmail" placeholder="E-posta Adresi (İsteğe bağlı)" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                            <select id="singleUserType" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                                <option value="YURTICI">Yurtiçi</option>
+                                <option value="YURTDISI">Yurtdışı</option>
+                            </select>
+                            <input type="text" id="singleAccountType" placeholder="Kullanıcı Tipi (Örn: Premium)" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                            <input type="text" id="singleSubscriptionPeriod" placeholder="Üyelik Süresi (Örn: 6 Ay)" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                            <button id="singleAddUserButton" class="w-full py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-semibold transition-colors">
+                                Yeni Kullanıcıyı Kaydet
+                            </button>
+                        </div>
+                    </details>
+
+                    <!-- 2. KULLANICI DÜZENLEME (AKORDİYON) -->
+                    <details class="group border rounded-xl bg-white shadow-md overflow-hidden">
+                        <summary class="p-4 font-bold text-gray-700 text-lg flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors">
+                            <span>2. Mevcut Kullanıcıyı Düzenle/Sil</span>
+                            <svg class="w-5 h-5 transform group-open:rotate-180 transition-transform" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                        </summary>
+                        <div class="p-4 border-t space-y-3">
+                            <label for="editUserSelect" class="block text-sm font-medium text-gray-700">Düzenlenecek Kullanıcıyı Seçin:</label>
+                            <select id="editUserSelect" class="w-full px-3 py-1.5 border rounded-lg text-sm bg-gray-50"></select>
+                            
+                            <div id="editUserForm" class="hidden space-y-3 pt-4 border-t">
+                                <input type="password" id="editPassword" placeholder="Yeni Şifre" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                                <input type="text" id="editExpiryDate" placeholder="Yeni Bitiş Tarihi (YYYY-MM-DD)" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                                <input type="email" id="editEmail" placeholder="Yeni E-posta Adresi" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                                <select id="editUserType" class="w-full px-3 py-1.5 border rounded-lg text-sm"></select>
+                                <input type="text" id="editAccountType" placeholder="Yeni Kullanıcı Tipi" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                                <input type="text" id="editSubscriptionPeriod" placeholder="Yeni Üyelik Süresi" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                                <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                                    <button id="updateUserButton" class="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors">Kullanıcıyı Güncelle</button>
+                                    <button id="deleteUserButton" class="w-full py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold transition-colors">Kullanıcıyı Sil</button>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- 3. TOPLU KULLANICI EKLEME (AKORDİYON) -->
+                    <details class="group border rounded-xl bg-white shadow-md overflow-hidden">
+                        <summary class="p-4 font-bold text-gray-700 text-lg flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors">
+                            <span>3. Toplu Kullanıcı Ekleme</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>
+                        </summary>
+                        <div class="p-4 border-t space-y-3">
+                            <p class="text-sm text-gray-500">
+                                Excel'den verileri virgülle ayrılmış şekilde yapıştırın. (userType alanı YURTICI, YURTDISI olmalıdır.)
+                                <code class="block mt-1 p-1 bg-gray-200 rounded text-xs">kullaniciAdi,sifre,bitisTarihi,tipi,sure,userType,email(isteğe bağlı)</code>
+                            </p>
+                            <textarea id="bulkUserInput" rows="5" placeholder="Örn: userA,pass1,2026-05-10,Premium,6 Ay,YURTDISI,user@mail.com" class="w-full px-3 py-2 border rounded-lg text-sm focus:border-green-500 focus:ring-green-500"></textarea>
+                            <button id="bulkAddUsersButton" class="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition-colors">
+                                Toplu Kullanıcıları Ekle
+                            </button>
+                        </div>
+                    </details>
+
+                    <!-- 4. TOPLU MESAJ GÖNDERME (AKORDİYON) -->
+                    <details class="group border rounded-xl bg-white shadow-md overflow-hidden">
+                        <summary class="p-4 font-bold text-gray-700 text-lg flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors">
+                            <span>4. Toplu Mesaj Gönder</span>
+                            <svg class="w-5 h-5 transform group-open:rotate-180 transition-transform" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                        </summary>
+                        <div class="p-4 border-t space-y-3">
+                            <label for="bulkMessageInput" class="block text-sm font-medium text-gray-700">Tüm kullanıcılara gönderilecek mesaj:</label>
+                            <textarea id="bulkMessageInput" rows="4" placeholder="Duyuru, bakım bildirimi veya kampanya mesajınızı buraya yazın..." class="w-full px-3 py-2 border rounded-lg text-sm"></textarea>
+                            <button id="sendBulkMessageButton" class="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition-colors">
+                                Mesajı Tüm Kullanıcılara Gönder
+                            </button>
+                        </div>
+                    </details>
+
+                </div>
+                <!-- YÖNETİM ARAÇLARI BİTİŞ -->
+
+                <!-- 4. FİYAT LİSTESİ YÖNETİMİ GÖRÜNÜMÜ (YENİ) -->
+                <div id="adminPriceManagementView" class="admin-panel-view hidden space-y-6">
+                    <div class="border p-4 rounded-xl bg-white space-y-3 shadow-md">
+                        <h4 class="font-bold text-gray-700 text-lg border-b pb-2 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"></path></svg>
+                            Fiyat Listesi Yönetimi (TL)
+                        </h4>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <!-- TEKLİ FİYATLAR -->
+                            <div class="space-y-2 border p-3 rounded-lg bg-gray-50">
+                                <p class="font-bold text-sm text-gray-700">Tekli Abonelik Fiyatları</p>
+                                <input type="number" id="priceSingle3M" placeholder="3 Ay (TL)" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                                <input type="number" id="priceSingle6M" placeholder="6 Ay (TL)" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                                <input type="number" id="priceSingle12M" placeholder="12 Ay (TL)" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                            </div>
+                            
+                            <!-- ÇİFTLİ FİYATLAR -->
+                            <div class="space-y-2 border p-3 rounded-lg bg-gray-50">
+                                <p class="font-bold text-sm text-gray-700">Çiftli Abonelik Fiyatları (12 Ay)</p>
+                                <input type="number" id="priceDouble12M" placeholder="12 Ay Çift (TL)" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                            </div>
+                        </div>
+
+                        <button id="updatePriceListButton" class="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold transition-colors">
+                            Fiyat Listesini Güncelle
+                        </button>
+                        <div id="currentPriceListStatus" class="text-xs text-center p-2 rounded-lg bg-gray-100 font-mono">Mevcut fiyatlar yükleniyor...</div>
+                    </div>
+                </div>
+                <!-- FİYAT LİSTESİ YÖNETİMİ BİTİŞ -->
+
+                <!-- 5. MESAJ YÖNETİMİ GÖRÜNÜMÜ (YENİ) -->
+                <div id="adminMessagesView" class="admin-panel-view hidden space-y-6">
+                    <div class="border p-4 rounded-xl bg-white space-y-3 shadow-md">
+                        <h4 class="font-bold text-gray-700 text-lg border-b pb-2 flex items-center justify-between">
+                            <span class="flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"></path></svg>
+                                Gönderilen Mesajlar Arşivi
+                            </span>
+                            <button id="refreshMessagesButton" class="py-1 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs transition-colors">Yenile</button>
+                        </h4>
+                        <div id="adminMessagesList" class="max-h-96 overflow-y-auto mt-3 border rounded-lg bg-gray-50">
+                            <p class="text-center p-4 text-gray-500">Henüz gönderilmiş mesaj yok.</p>
+                        </div>
+                    </div>
+                </div>
+                <!-- MESAJ YÖNETİMİ BİTİŞ -->
+
+            </div>
+        </div>
+        
+        <!-- YENİ HESAP ONAY MODAL'I -->
+        <div id="accountApprovalModal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <h3 class="text-xl sm:text-2xl font-bold text-orange-700 border-b pb-2 mb-4 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 00-4-4H9a4 4 0 00-4 4v2"></path><circle cx="12" cy="7" r="4"></circle><path d="M16 11l-3 3-1-1"></path></svg>
+                    Yeni Kullanıcıyı Onayla ve Kaydet
+                </h3>
+                <div id="modalUserInfo" class="mb-4 p-3 bg-gray-100 rounded-lg text-sm space-y-1">
+                    <p><strong>Talep ID:</strong> <span id="modalRequestId"></span></p>
+                    <p><strong>Talep Tipi:</strong> <span id="modalRequestType" class="font-bold text-orange-600"></span></p>
+                    <p><strong>Telefon:</strong> <span id="modalRequestPhone"></span></p>
+                    <p><strong>E-posta:</strong> <span id="modalRequestEmail"></span></p>
+                    <p><strong>İstenen Süre:</strong> <span id="modalRequestDuration"></span></p>
+                </div>
+                
+                <div class="space-y-3">
+                    <label class="block text-sm font-medium text-gray-700">Kullanıcı Adı (Zorunlu):</label>
+                    <input type="text" id="modalUsername" placeholder="Kullanıcı Adı Atayın" class="w-full px-3 py-2 border rounded-lg">
+                    
+                    <label class="block text-sm font-medium text-gray-700">Şifre (Zorunlu):</label>
+                    <input type="password" id="modalPassword" placeholder="Şifre Atayın" class="w-full px-3 py-2 border rounded-lg">
+                    
+                    <label class="block text-sm font-medium text-gray-700">Bitiş Tarihi (YYYY-MM-DD):</label>
+                    <input type="text" id="modalExpiryDate" placeholder="2027-01-01" class="w-full px-3 py-2 border rounded-lg">
+
+                    <label class="block text-sm font-medium text-gray-700">Hesap Tipi (Örn: Premium):</label>
+                    <input type="text" id="modalAccountType" placeholder="Hesap Tipi" class="w-full px-3 py-2 border rounded-lg" value="Standart">
+
+                    <label class="block text-sm font-medium text-gray-700">Üyelik Süresi (Örn: 6 Ay):</label>
+                    <input type="text" id="modalSubscriptionPeriod" placeholder="Üyelik Süresi" class="w-full px-3 py-2 border rounded-lg">
+                    
+                    <label class="block text-sm font-medium text-gray-700">Kullanım Alanı (Yurtiçi/Yurtdışı):</label>
+                    <select id="modalUserType" class="w-full px-3 py-2 border rounded-lg">
+                        <option value="YURTICI">Yurtiçi</option>
+                        <option value="YURTDISI">Yurtdışı</option>
+                    </select>
+
+                    <!-- YENİ: Yönetici Notları Alanı -->
+                    <label class="block text-sm font-medium text-gray-700">Yönetici Notları (İsteğe bağlı):</label>
+                    <textarea id="modalAdminNotes" rows="3" placeholder="Örn: Ödeme alındı, giriş bilgileri mail ile gönderildi." class="w-full px-3 py-2 border rounded-lg"></textarea>
+                </div>
+
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button id="closeModalButton" class="py-2 px-4 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-lg font-semibold transition-colors">
+                        Vazgeç
+                    </button>
+                    <button id="saveApprovedAccountButton" class="py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold transition-colors">
+                        Kullanıcıyı Kaydet ve Onayla
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Hata ve Mesaj Alanı -->
+        <div id="messageBox" class="hidden p-4 mt-4 text-sm rounded-xl font-semibold" role="alert"></div>
+
+        <!-- YENİ: ALT BİLGİ -->
+        <footer class="mt-8 pt-4 border-t border-gray-200 text-center">
+            <p class="text-sm text-gray-500">Daha fazla bilgi için sitemizi ziyaret edin.</p>
+            <a href="http://www.balkanpremiumtv.de" target="_blank" class="text-sm font-semibold text-orange-600 hover:text-orange-800 transition-colors">www.balkanpremiumtv.de</a>
+        </footer>
+    </div>
+
+    <!-- Firebase Script -->
+    <script type="module">
+        // ===============================================
+        // 🚨 KENDİ FIREBASE YAPILANDIRMANIZ BURADA
+        // ===============================================
+
+        // Eğer Canvas'tan gelmiyorsa, sizin projeniz için varsayılan değerleri kullanır:
+        const DEFAULT_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyA5tsHpbIjS7IEsSj7MGlMdk1o5y30Q7Tc",
+            authDomain: "balkantvpanel.firebaseapp.com",
+            projectId: "balkantvpanel",
+            storageBucket: "balkantvpanel.firebasestorage.app",
+            messagingSenderId: "377175532888",
+            appId: "1:377175532888:web:00ab5d929371adad0af12d",
+            measurementId: "G-JN2VZ9V587"
+        };
+        
+        // Canvas Global Değişkenleri (Gerekli değilse varsayılanı kullanır)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : DEFAULT_FIREBASE_CONFIG;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // ===============================================
+        // FIREBASE İMPORTLARI
+        // ===============================================
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, getDocs, collection, addDoc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        let app, db, auth, userId = null;
+        let isAuthReady = false;
+        let globalUrls = {}; 
+        let currentLoggedInUser = null; 
+        let allUsersData = []; 
+        let newAccountRequestsData = []; 
+        let adminCreds = {}; 
+        let priceList = {}; // Fiyat Listesi
+        let allMessages = []; // Tüm Mesajlar
+
+        // Sayfalama Değişkenleri
+        const USERS_PER_PAGE = 20;
+        let currentPage = 1;
+        let totalPages = 1;
+
+        // UI Elementleri (Ortak)
+        const authStatusEl = document.getElementById('authStatus');
+        const messageBox = document.getElementById('messageBox');
+        const loginFormContainer = document.getElementById('loginFormContainer');
+        const userView = document.getElementById('userView');
+        const adminView = document.getElementById('adminView');
+
+        // UI Elementleri (Müşteri)
+        const loginButton = document.getElementById('loginButton');
+        const usernameInput = document.getElementById('iptvUsernameInput');
+        const passwordInput = document.getElementById('iptvPasswordInput'); 
+        const showNewAccountFormButton = document.getElementById('showNewAccountFormButton'); 
+        const resultContainer = document.getElementById('resultContainer');
+        const userDataDisplay = document.getElementById('userDataDisplay');
+        const userWelcomeHeader = document.getElementById('userWelcomeHeader'); 
+        const renewalDurationSelect = document.getElementById('renewalDuration');
+        const phoneNumberInput = document.getElementById('phoneNumberInput'); 
+        const renewalUserTypeSelect = document.getElementById('renewalUserTypeSelect'); 
+        const sendRenewalRequestButton = document.getElementById('sendRenewalRequestButton');
+        const userLogoutButton = document.getElementById('userLogoutButton');
+        const navUserInfo = document.getElementById('navUserInfo');
+        const navUserRenewal = document.getElementById('navUserRenewal');
+        const navPriceList = document.getElementById('navPriceList'); // YENİ
+        const userInfoView = document.getElementById('userInfoView');
+        const userRenewalView = document.getElementById('userRenewalView');
+        const userPriceListView = document.getElementById('userPriceListView'); // YENİ
+        const priceListDisplay = document.getElementById('priceListDisplay'); // YENİ
+        const navUserMessages = document.getElementById('navUserMessages'); // YENİ
+        const userMessagesView = document.getElementById('userMessagesView'); // YENİ
+
+        // Yeni Hesap Oluşturma UI
+        const newAccountRequestContainer = document.getElementById('newAccountRequestContainer');
+        const newAccountPhoneInput = document.getElementById('newAccountPhoneInput');
+        const newAccountEmailInput = document.getElementById('newAccountEmailInput');
+        const newAccountDurationSelect = document.getElementById('newAccountDurationSelect');
+        const newAccountTypeSelect = document.getElementById('newAccountTypeSelect');
+        const submitNewAccountRequestButton = document.getElementById('submitNewAccountRequestButton');
+        const hideNewAccountFormButton = document.getElementById('hideNewAccountFormButton');
+        
+        // UI Elementleri (Yönetici)
+        const adminLogoutButton = document.getElementById('adminLogoutButton');
+        const navDashboard = document.getElementById('navDashboard');
+        const navUserManagement = document.getElementById('navUserManagement'); 
+        const navRegisteredUsers = document.getElementById('navRegisteredUsers'); 
+        const navPriceManagement = document.getElementById('navPriceManagement'); // YENİ
+        const navMessages = document.getElementById('navMessages'); // YENİ
+        const adminDashboardView = document.getElementById('adminDashboardView');
+        const adminUserManagementView = document.getElementById('adminUserManagementView'); 
+        const adminRegisteredUsersView = document.getElementById('adminRegisteredUsersView'); 
+        const adminPriceManagementView = document.getElementById('adminPriceManagementView'); // YENİ
+        const adminMessagesView = document.getElementById('adminMessagesView'); // YENİ
+
+        // Dashboard Metrikleri
+        const metricActiveUsersEl = document.getElementById('metricActiveUsers');
+        const metricExpiringSoonEl = document.getElementById('metricExpiringSoon');
+        const metricExpiredEl = document.getElementById('metricExpired');
+        const metricRenewalRequestsEl = document.getElementById('metricRenewalRequests');
+        const metricNewAccountRequestsEl = document.getElementById('metricNewAccountRequests'); 
+        const metricNewUsersLast7DaysEl = document.getElementById('metricNewUsersLast7Days'); // YENİ
+
+        // URL Yönetimi
+        const updateDomesticUrlButton = document.getElementById('updateDomesticUrlButton');
+        const updateInternationalUrlButton = document.getElementById('updateInternationalUrlButton');
+        const globalDomesticUrlInput = document.getElementById('globalDomesticUrlInput');
+        const globalInternationalUrlInput = document.getElementById('globalInternationalUrlInput');
+        const currentGlobalUrlEl = document.getElementById('currentGlobalUrl');
+
+        // Fiyat Yönetimi (YENİ)
+        const priceSingle3MInput = document.getElementById('priceSingle3M');
+        const priceSingle6MInput = document.getElementById('priceSingle6M');
+        const priceSingle12MInput = document.getElementById('priceSingle12M');
+        const priceDouble12MInput = document.getElementById('priceDouble12M');
+        const updatePriceListButton = document.getElementById('updatePriceListButton');
+        const currentPriceListStatusEl = document.getElementById('currentPriceListStatus');
+
+        // Kullanıcı Listesi ve Yönetim Elemanları
+        const bulkAddUsersButton = document.getElementById('bulkAddUsersButton');
+        const bulkUserInput = document.getElementById('bulkUserInput');
+        const refreshUserListButton = document.getElementById('refreshUserListButton');
+        const userSearchInput = document.getElementById('userSearchInput');
+        const userListContent = document.getElementById('userListContent');
+        const userCountEl = document.getElementById('userCount');
+        const listStatusEl = document.getElementById('listStatus');
+        const paginationControlsEl = document.getElementById('paginationControls'); 
+
+        // Talep Yönetimi
+        const refreshRequestsButton = document.getElementById('refreshRequestsButton');
+        const renewalRequestsList = document.getElementById('renewalRequestsList');
+        const requestCountEl = document.getElementById('requestCount');
+
+        // Yeni Hesap Talepleri Yönetimi
+        const refreshNewAccountRequestsButton = document.getElementById('refreshNewAccountRequestsButton');
+        const newAccountRequestsList = document.getElementById('newAccountRequestsList');
+        const newAccountRequestCountEl = document.getElementById('newAccountRequestCount');
+        const newAccountRequestStatusEl = document.getElementById('newAccountRequestStatus');
+
+        // Tekil Ekleme 
+        const singleAddUserButton = document.getElementById('singleAddUserButton');
+        const singleUsernameInput = document.getElementById('singleUsername');
+        const singlePasswordInput = document.getElementById('singlePassword');
+        const singleExpiryDateInput = document.getElementById('singleExpiryDate');
+        const singleEmailInput = document.getElementById('singleEmail');
+        const singleUserTypeSelect = document.getElementById('singleUserType');
+        const singleAccountTypeInput = document.getElementById('singleAccountType');
+        const singleSubscriptionPeriodInput = document.getElementById('singleSubscriptionPeriod');
+
+        // Kullanıcı Düzenleme/Silme (YENİ)
+        const editUserSelect = document.getElementById('editUserSelect');
+        const editUserForm = document.getElementById('editUserForm');
+        const editPasswordInput = document.getElementById('editPassword');
+        const editExpiryDateInput = document.getElementById('editExpiryDate');
+        const editEmailInput = document.getElementById('editEmail');
+        const editUserTypeSelect = document.getElementById('editUserType');
+        const editAccountTypeInput = document.getElementById('editAccountType');
+        const editSubscriptionPeriodInput = document.getElementById('editSubscriptionPeriod');
+        const updateUserButton = document.getElementById('updateUserButton');
+        const deleteUserButton = document.getElementById('deleteUserButton');
+
+        // Toplu Mesajlaşma (YENİ)
+        const bulkMessageInput = document.getElementById('bulkMessageInput');
+        const sendBulkMessageButton = document.getElementById('sendBulkMessageButton');
+        const userMessagesContainer = document.getElementById('userMessagesContainer');
+        const adminMessagesList = document.getElementById('adminMessagesList');
+        const refreshMessagesButton = document.getElementById('refreshMessagesButton');
+
+        // Modal Öğeleri
+        const accountApprovalModal = document.getElementById('accountApprovalModal');
+        const closeModalButton = document.getElementById('closeModalButton');
+        const saveApprovedAccountButton = document.getElementById('saveApprovedAccountButton');
+        // Modal Form Alanları
+        const modalRequestId = document.getElementById('modalRequestId');
+        const modalRequestType = document.getElementById('modalRequestType');
+        const modalRequestPhone = document.getElementById('modalRequestPhone');
+        const modalRequestEmail = document.getElementById('modalRequestEmail');
+        const modalRequestDuration = document.getElementById('modalRequestDuration');
+        const modalUsernameInput = document.getElementById('modalUsername');
+        const modalPasswordInput = document.getElementById('modalPassword');
+        const modalExpiryDateInput = document.getElementById('modalExpiryDate');
+        const modalAccountTypeInput = document.getElementById('modalAccountType');
+        const modalSubscriptionPeriodInput = document.getElementById('modalSubscriptionPeriod');
+        const modalUserTypeSelect = document.getElementById('modalUserType');
+        const modalAdminNotesInput = document.getElementById('modalAdminNotes'); 
+
+        let currentModalRequestId = null; 
+        
+
+        // Firestore'a özel log seviyesini ayarlayın
+        setLogLevel('Debug');
+
+        /**
+         * Kalan gün sayısını hesaplar (YENİ)
+         */
+        function calculateRemainingDays(expiryDateString) {
+            if (!expiryDateString) return { text: 'Tarih Yok', class: 'text-gray-500' };
+            const now = new Date();
+            const expiry = new Date(expiryDateString);
+            // Saat, dakika, saniye farklarını sıfırlayarak sadece gün bazında karşılaştırma yap
+            now.setHours(0, 0, 0, 0);
+            expiry.setHours(0, 0, 0, 0);
+
+            const diffTime = expiry - now;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffDays < 0) return { text: 'Süresi Doldu', class: 'text-red-600 font-bold' };
+            return { text: `${diffDays} gün`, class: diffDays <= 30 ? 'text-yellow-600 font-bold' : 'text-green-600' };
+        }
+
+        /**
+         * Toast/Mesaj Kutusu Gösterme Fonksiyonu
+         */
+        function showMessage(message, type = 'info') {
+            messageBox.textContent = message;
+            messageBox.classList.remove('hidden', 'bg-red-100', 'text-red-800', 'bg-green-100', 'text-green-800', 'bg-blue-100', 'text-blue-800');
+            
+            if (type === 'error') {
+                messageBox.classList.add('bg-red-100', 'text-red-800');
+            } else if (type === 'success') {
+                messageBox.classList.add('bg-green-100', 'text-green-800');
+            } else { // info
+                messageBox.classList.add('bg-blue-100', 'text-blue-800');
+            }
+
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, 5000);
+        }
+        
+        /**
+         * UI'ı oturum açma öncesi duruma getirir (Çıkış Yapma)
+         */
+        function resetUI() {
+            loginFormContainer.style.display = 'block';
+            newAccountRequestContainer.style.display = 'none'; 
+            userView.style.display = 'none';
+            adminView.style.display = 'none';
+            resultContainer.classList.add('hidden');
+            usernameInput.value = '';
+            passwordInput.value = '';
+            currentLoggedInUser = null;
+            allUsersData = [];
+            closeModal();
+            showMessage("Oturum kapatıldı.", 'info');
+        }
+        
+        /**
+         * Yönetici Paneli Görünümünü Değiştirir
+         */
+        function showAdminView(viewName) {
+            const views = {
+                dashboard: adminDashboardView,
+                registeredUsers: adminRegisteredUsersView,
+                managementTools: adminUserManagementView,
+                priceManagement: adminPriceManagementView,
+                messages: adminMessagesView // YENİ
+            };
+            const navButtons = {
+                dashboard: navDashboard,
+                registeredUsers: navRegisteredUsers,
+                managementTools: navUserManagement,
+                priceManagement: navPriceManagement,
+                messages: navMessages // YENİ
+            };
+
+            for (const name in views) {
+                views[name].classList.add('hidden');
+                if (!navButtons[name]) continue; 
+                navButtons[name].classList.remove('bg-orange-600', 'text-white');
+                navButtons[name].classList.add('text-orange-600', 'hover:bg-orange-100');
+            }
+
+            views[viewName].classList.remove('hidden');
+            navButtons[viewName].classList.add('bg-orange-600', 'text-white');
+            navButtons[viewName].classList.remove('text-orange-600', 'hover:bg-orange-100');
+
+            if (viewName === 'dashboard') {
+                calculateMetrics(allUsersData);
+                fetchRenewalRequests();
+                fetchNewAccountRequests();
+            } else if (viewName === 'registeredUsers' || viewName === 'managementTools') {
+                 if(allUsersData.length === 0) {
+                     fetchAllUsers();
+                   } else {
+                     displayFilteredUsers(allUsersData);
+                   }
+            } else if (viewName === 'priceManagement') {
+                if (Object.keys(priceList).length === 0) {
+                    fetchPriceList(true);
+                }
+            } else if (viewName === 'messages') {
+                fetchAdminMessages();
+            }
+        }
+        
+        /**
+         * Kullanıcı Paneli Görünümünü Değiştirir
+         */
+        function showUserView(viewName) {
+            const views = {
+                info: userInfoView,
+                renewal: userRenewalView,
+                priceList: userPriceListView,
+                messages: userMessagesView // YENİ
+            };
+            const navButtons = {
+                info: navUserInfo,
+                renewal: navUserRenewal,
+                priceList: navPriceList,
+                messages: navUserMessages // YENİ
+            };
+
+            for (const name in views) {
+                views[name].style.display = 'none';
+                navButtons[name].classList.remove('bg-orange-600', 'text-white');
+                navButtons[name].classList.add('text-orange-600', 'hover:bg-orange-100');
+            }
+
+            views[viewName].style.display = 'block';
+            navButtons[viewName].classList.add('bg-orange-600', 'text-white');
+            navButtons[viewName].classList.remove('text-orange-600', 'hover:bg-orange-100');
+            
+            if (viewName === 'renewal' && currentLoggedInUser) {
+                renewalUserTypeSelect.value = currentLoggedInUser.userType || 'YURTICI';
+            } else if (viewName === 'priceList') {
+                displayUserPriceList(); // YENİ Fiyat listesini göster
+            } else if (viewName === 'messages') {
+                displayUserMessages(); // YENİ Mesajları göster
+            }
+        }
+        
+        /**
+         * Yeni Hesap Talebi Modal'ını Açar
+         */
+        function openAccountApprovalModal(requestData) {
+            currentModalRequestId = requestData.id;
+            
+            // Modal Bilgilerini Doldur
+            modalRequestId.textContent = requestData.id.substring(0, 8) + '...';
+            modalRequestType.textContent = requestData.userType;
+            modalRequestPhone.textContent = requestData.phoneNumber;
+            modalRequestEmail.textContent = requestData.email || 'Bilinmiyor';
+            modalRequestDuration.textContent = requestData.requestDuration;
+
+            // Form Alanlarını Önceden Doldur/Temizle
+            modalUsernameInput.value = '';
+            modalPasswordInput.value = '';
+            modalExpiryDateInput.value = new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().substring(0, 10); // Varsayılan 1 yıl sonra
+            modalAccountTypeInput.value = 'Standart Paket';
+            modalSubscriptionPeriodInput.value = requestData.requestDuration || '12 Ay';
+            modalUserTypeSelect.value = requestData.userType || 'YURTICI';
+            modalAdminNotesInput.value = ''; 
+
+            // Modal'ı Göster
+            accountApprovalModal.classList.remove('hidden');
+        }
+
+        /**
+         * Yeni Hesap Talebi Modal'ını Kapatır
+         */
+        function closeModal() {
+            accountApprovalModal.classList.add('hidden');
+            currentModalRequestId = null;
+        }
+
+        /**
+         * Kaydedilen Yeni Kullanıcıyı Onaylar ve Kaydeder
+         */
+        async function saveApprovedAccount() {
+            if (!currentModalRequestId) return;
+
+            const username = modalUsernameInput.value.trim();
+            const password = modalPasswordInput.value.trim();
+            const expiryDate = modalExpiryDateInput.value.trim();
+            const accountType = modalAccountTypeInput.value.trim();
+            const subscriptionPeriod = modalSubscriptionPeriodInput.value.trim();
+            const userType = modalUserTypeSelect.value;
+            const email = modalRequestEmail.textContent.includes('Bilinmiyor') ? '' : modalRequestEmail.textContent;
+            const adminNotes = modalAdminNotesInput.value.trim(); 
+
+            if (!username || !password || !expiryDate || !accountType || !userType) {
+                showMessage("Kullanıcı Adı, Şifre, Bitiş Tarihi, Hesap Tipi ve Kullanım Alanı zorunludur.", 'error');
+                return;
+            }
+
+            saveApprovedAccountButton.disabled = true;
+            saveApprovedAccountButton.textContent = "Kaydediliyor...";
+
+            const userRef = doc(db, `artifacts/${appId}/public/data/iptv_users`, username);
+            const requestRef = doc(db, `artifacts/${appId}/public/data/new_account_requests`, currentModalRequestId);
+
+            try {
+                // 1. Yeni Kullanıcıyı Aktif Listeye Kaydet
+                const userData = {
+                    iptvUsername: username,
+                    iptvPassword: password,
+                    expirationDate: expiryDate,
+                    accountType: accountType,
+                    subscriptionPeriod: subscriptionPeriod,
+                    userType: userType,
+                    email: email, 
+                    adminCreationNotes: adminNotes, 
+                    lastLoginDate: new Date().toISOString(), 
+                    lastUpdate: new Date().toISOString()
+                };
+
+                await setDoc(userRef, userData, { merge: true });
+
+                // 2. Orijinal Talep Kaydını Sil
+                await deleteDoc(requestRef); 
+
+                showMessage(`'${username}' kullanıcısı başarıyla oluşturuldu ve talep kapatıldı.`, 'success');
+                
+                closeModal();
+                fetchAllUsers(true); // Liste ve metrikleri yenile
+
+            } catch (error) {
+                console.error(`Kullanıcı kaydetme hatası:`, error);
+                showMessage(`Kullanıcı kaydetme hatası: ${error.message}`, 'error');
+            } finally {
+                saveApprovedAccountButton.disabled = false;
+                saveApprovedAccountButton.textContent = "Kullanıcıyı Kaydet ve Onayla";
+            }
+        }
+
+
+        /**
+         * Merkezi Global URL'yi getirir ve UI'ı günceller.
+         */
+        async function fetchGlobalUrl() {
+            if (!isAuthReady) return;
+            try {
+                const globalUrlRef = doc(db, `artifacts/${appId}/public/data/settings`, 'global');
+                const docSnap = await getDoc(globalUrlRef);
+                
+                // Varsayılan değerler
+                const defaultUrls = {
+                    domestic: 'http://default.domestic.link/list.m3u',
+                    international: 'http://default.international.link/list.m3u'
+                };
+                
+                if (docSnap.exists()) {
+                    globalUrls = docSnap.data();
+                    
+                    globalUrls.domestic = globalUrls.domestic || defaultUrls.domestic;
+                    globalUrls.international = globalUrls.international || defaultUrls.international;
+
+                    currentGlobalUrlEl.innerHTML = `
+                        Yurtiçi: <code class="text-orange-600 break-all">${globalUrls.domestic}</code><br>
+                        Yurtdışı: <code class="text-orange-600 break-all">${globalUrls.international}</code>
+                    `;
+                    globalDomesticUrlInput.value = globalUrls.domestic;
+                    globalInternationalUrlInput.value = globalUrls.international;
+                    
+                } else {
+                    globalUrls = defaultUrls;
+                    currentGlobalUrlEl.innerHTML = `Mevcut URL'ler: <code class="text-red-500 break-all">Ayarlanmadı. Varsayılan kullanılıyor.</code>`;
+                    await setDoc(globalUrlRef, globalUrls);
+                }
+            } catch (error) {
+                console.error("Global URL çekme hatası:", error);
+                currentGlobalUrlEl.innerHTML = `Mevcut URL: <code class="text-red-500">Hata!</code>`;
+            }
+        }
+        
+        /**
+         * Yönetici kimlik bilgilerini Firestore'dan çeker.
+         */
+        async function fetchAdminCredentials() {
+            if (!isAuthReady) return;
+            const adminUserRef = doc(db, `artifacts/${appId}/public/data/settings`, 'admin');
+            const docSnap = await getDoc(adminUserRef);
+            
+            if (docSnap.exists()) {
+                adminCreds = docSnap.data();
+            }
+        }
+        
+        /**
+         * Fiyat Listesini Firestore'dan çeker ve Admin/User UI'ını günceller.
+         * @param {boolean} updateAdminUI - Sadece yönetici panelindeki fiyat girişlerini güncellemek için
+         */
+        async function fetchPriceList(updateAdminUI = false) {
+            if (!isAuthReady) return;
+
+            try {
+                const priceRef = doc(db, `artifacts/${appId}/public/data/settings`, 'price_list');
+                const docSnap = await getDoc(priceRef);
+                
+                // Varsayılan fiyatlar
+                const defaultPrices = {
+                    single3M: 90, single6M: 150, single12M: 250, double12M: 350
+                };
+                
+                if (docSnap.exists()) {
+                    priceList = docSnap.data();
+                    // Eksik alanları varsayılanla doldur
+                    priceList = { ...defaultPrices, ...priceList };
+                } else {
+                    priceList = defaultPrices;
+                    await setDoc(priceRef, priceList);
+                }
+
+                if (updateAdminUI) {
+                    priceSingle3MInput.value = priceList.single3M;
+                    priceSingle6MInput.value = priceList.single6M;
+                    priceSingle12MInput.value = priceList.single12M;
+                    priceDouble12MInput.value = priceList.double12M;
+                    currentPriceListStatusEl.textContent = `Son Güncelleme: ${new Date().toLocaleTimeString('tr-TR')}`;
+                }
+                
+                // Müşteri fiyat listesini de güncelle (YENİ)
+                if(userPriceListView.style.display !== 'none' || !updateAdminUI) {
+                    displayUserPriceList();
+                }
+
+            } catch (error) {
+                console.error("Fiyat listesi çekme hatası:", error);
+                currentPriceListStatusEl.textContent = `Hata: Fiyat listesi yüklenemedi.`;
+            }
+        }
+        
+        /**
+         * Müşteri Panelindeki Fiyat Listesini görüntüler (YENİ)
+         */
+        function displayUserPriceList() {
+            const prices = priceList;
+
+            const content = `
+                <table class="min-w-full divide-y divide-gray-300 rounded-lg overflow-hidden shadow-lg">
+                    <thead class="bg-orange-600 text-white">
+                        <tr>
+                            <th class="py-3 px-4 text-left text-sm font-semibold">Paket Tipi</th>
+                            <th class="py-3 px-4 text-center text-sm font-semibold">Süre</th>
+                            <th class="py-3 px-4 text-right text-sm font-semibold">Fiyat (TL)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <tr class="hover:bg-gray-50">
+                            <td class="py-3 px-4 font-medium">Tekli Kullanıcı</td>
+                            <td class="py-3 px-4 text-center">3 Ay</td>
+                            <td class="py-3 px-4 text-right text-lg font-bold text-green-700">${prices.single3M} ₺</td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="py-3 px-4 font-medium">Tekli Kullanıcı</td>
+                            <td class="py-3 px-4 text-center">6 Ay</td>
+                            <td class="py-3 px-4 text-right text-lg font-bold text-green-700">${prices.single6M} ₺</td>
+                        </tr>
+                        <tr class="hover:bg-gray-50 bg-orange-50 border-t-2 border-orange-200">
+                            <td class="py-3 px-4 font-medium text-orange-700">Tekli Kullanıcı (Popüler)</td>
+                            <td class="py-3 px-4 text-center text-orange-700">12 Ay</td>
+                            <td class="py-3 px-4 text-right text-xl font-extrabold text-orange-700">${prices.single12M} ₺</td>
+                        </tr>
+                        <tr class="hover:bg-gray-50 border-t border-gray-300">
+                            <td class="py-3 px-4 font-medium text-blue-700">Çiftli Kullanıcı</td>
+                            <td class="py-3 px-4 text-center text-blue-700">12 Ay</td>
+                            <td class="py-3 px-4 text-right text-xl font-extrabold text-blue-700">${prices.double12M} ₺</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="mt-4 text-sm text-center text-gray-600">Fiyatlar T.C. Türk Lirası (₺) cinsindendir. Güncel kur farkları uygulanabilir.</p>
+            `;
+            priceListDisplay.innerHTML = content;
+        }
+
+        /**
+         * Fiyat Listesini Günceller (YENİ)
+         */
+        async function updatePriceList() {
+            if (adminView.style.display === 'none') {
+                showMessage("Yetkisiz erişim.", 'error');
+                return;
+            }
+            
+            const newPrices = {
+                single3M: parseFloat(priceSingle3MInput.value) || 0,
+                single6M: parseFloat(priceSingle6MInput.value) || 0,
+                single12M: parseFloat(priceSingle12MInput.value) || 0,
+                double12M: parseFloat(priceDouble12MInput.value) || 0
+            };
+
+            if (Object.values(newPrices).some(p => p <= 0)) {
+                showMessage("Tüm fiyat alanları geçerli (pozitif) sayı olmalıdır.", 'error');
+                return;
+            }
+
+            updatePriceListButton.disabled = true;
+            updatePriceListButton.textContent = "Güncelleniyor...";
+
+            try {
+                const priceRef = doc(db, `artifacts/${appId}/public/data/settings`, 'price_list');
+                await setDoc(priceRef, newPrices, { merge: true });
+                
+                await fetchPriceList(true); // Hem fiyatı çek hem de Admin UI'ı güncelle
+                showMessage("Fiyat listesi başarıyla güncellendi!", 'success');
+
+            } catch (error) {
+                console.error("Fiyat listesi güncelleme hatası:", error);
+                showMessage(`Fiyat listesi güncelleme hatası: ${error.message}`, 'error');
+            } finally {
+                updatePriceListButton.disabled = false;
+                updatePriceListButton.textContent = "Fiyat Listesini Güncelle";
+            }
+        }
+
+
+        /**
+         * Firebase Başlatma ve Kimlik Doğrulama
+         */
+        async function initializeFirebase() {
+             try {
+                if (Object.keys(firebaseConfig).length === 0) {
+                    showMessage("Firebase yapılandırması eksik. Uygulama çalışmayacaktır.", 'error');
+                    authStatusEl.textContent = "HATA: Firebase yapılandırması eksik.";
+                    return;
+                }
+
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        authStatusEl.textContent = `Kimlik Doğrulama Başarılı. Kullanıcı ID: ${userId}`;
+                        isAuthReady = true;
+                        loginButton.disabled = false;
+                        
+                        // Firebase verilerini çek
+                        await fetchGlobalUrl();
+                        await fetchAdminCredentials();
+                        await fetchPriceList(false);
+                        
+                        const defaultLastLogin = new Date().toISOString(); 
+
+                        // Demo verileri (Yönetici)
+                        const adminUserRef = doc(db, `artifacts/${appId}/public/data/settings`, 'admin');
+                        if (!adminCreds.adminUsername) {
+                           await setDoc(adminUserRef, { adminUsername: "admin", adminPassword: "adminPassword123", lastUpdate: new Date().toISOString() });
+                           await fetchAdminCredentials(); 
+                           showMessage(`Demo Admin Kullanıcısı ('admin') eklendi. Şifre: adminPassword123`, 'info');
+                        }
+
+                        // Demo verileri (Müşteriler)
+                        const demoUsername = "deneme123";
+                        const demoUserRef = doc(db, `artifacts/${appId}/public/data/iptv_users`, demoUsername);
+                        const docSnap = await getDoc(demoUserRef);
+                        
+                        if (!docSnap.exists()) {
+                           await setDoc(demoUserRef, { 
+                                iptvUsername: demoUsername, iptvPassword: "gizliSifre", expirationDate: "2026-01-01", 
+                                accountType: "Deneme Paketi", subscriptionPeriod: "7 Gün", userType: "YURTICI", 
+                                email: "demo@example.com", lastLoginDate: defaultLastLogin, 
+                                lastUpdate: new Date().toISOString() 
+                            });
+                           const demoUserIntRef = doc(db, `artifacts/${appId}/public/data/iptv_users`, "abone55");
+                             await setDoc(demoUserIntRef, { 
+                                iptvUsername: "abone55", iptvPassword: "yurtdisi", expirationDate: "2026-03-01", 
+                                accountType: "Standart Paket", subscriptionPeriod: "6 Ay", userType: "YURTDISI", 
+                                email: "abone@example.com", lastLoginDate: defaultLastLogin, 
+                                lastUpdate: new Date().toISOString() 
+                            });
+                            showMessage(`Demo Kullanıcılar (deneme123 ve abone55) eklendi.`, 'info');
+                        }
+
+                    } else {
+                        authStatusEl.textContent = "Kimlik Doğrulama bekleniyor...";
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebase başlatma hatası:", error);
+                showMessage(`Sistem hatası: ${error.message}`, 'error');
+                authStatusEl.textContent = `HATA: ${error.message}`;
+            }
+        }
+
+        /**
+         * Birleşik Giriş İşleyicisi (Müşteri veya Yönetici)
+         */
+        async function handleMainLogin() {
+            if (!isAuthReady) {
+                showMessage("Sistem henüz hazır değil. Lütfen bekleyiniz.", 'error');
+                return;
+            }
+
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value.trim();
+            
+            if (!username || !password) {
+                showMessage("Lütfen kullanıcı adı ve şifrenizi giriniz.", 'info');
+                return;
+            }
+            
+            loginButton.disabled = true;
+            loginButton.textContent = "Giriş Yapılıyor...";
+            
+            // 1. YÖNETİCİ KONTROLÜ
+            if (username === adminCreds.adminUsername && password === adminCreds.adminPassword) {
+                showMessage("Yönetici girişi başarılı!", 'success');
+                loginFormContainer.style.display = 'none';
+                adminView.style.display = 'block';
+                fetchAllUsers(true); 
+                showAdminView('dashboard'); 
+                loginButton.disabled = false;
+                loginButton.textContent = "Giriş Yap";
+                return;
+            }
+
+            // 2. MÜŞTERİ KONTROLÜ
+            try {
+                const userRef = doc(db, `artifacts/${appId}/public/data/iptv_users`, username);
+                const docSnap = await getDoc(userRef);
+
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    
+                    if (data.iptvPassword !== password) {
+                         showMessage(`Hata: Yanlış şifre. Lütfen tekrar deneyin.`, 'error');
+                         return;
+                    }
+                    
+                    // Kullanım alanına göre URL ataması
+                    if (data.userType === 'YURTICI') {
+                        data.newUrl = globalUrls.domestic;
+                    } else if (data.userType === 'YURTDISI') {
+                        data.newUrl = globalUrls.international;
+                    } else {
+                        data.newUrl = globalUrls.domestic; 
+                    }
+
+                    currentLoggedInUser = data;
+                    
+                    // Son giriş tarihini güncelle
+                    const nowIso = new Date().toISOString();
+                    const updateData = { lastLoginDate: nowIso };
+                    await setDoc(userRef, updateData, { merge: true });
+                    
+                    // Güncellenmiş veriyi UI'da göstermek için yükle
+                    data.lastLoginDate = nowIso; 
+                    
+                    // Kullanıcı arayüzünü güncelle
+                    userWelcomeHeader.textContent = `Hoş Geldiniz, ${data.iptvUsername}!`;
+                    displayUserData(data);
+
+                    loginFormContainer.style.display = 'none';
+                    userView.style.display = 'block';
+                    showUserView('info'); 
+                    showMessage(`Giriş başarılı! Güncel bilgileriniz görüntülendi.`, 'success');
+                } else {
+                    showMessage(`Hata: Kullanıcı adı veya şifre yanlış. Lütfen kontrol edin.`, 'error');
+                }
+            } catch (error) {
+                console.error("Giriş hatası:", error);
+                showMessage(`Sistem hatası: ${error.message}`, 'error');
+            } finally {
+                loginButton.disabled = false;
+                loginButton.textContent = "Giriş Yap";
+            }
+        }
+        
+        /**
+         * Yeni Hesap Oluşturma Talebi Gönderir
+         */
+        async function submitNewAccountRequest() {
+            const phone = newAccountPhoneInput.value.trim();
+            const email = newAccountEmailInput.value.trim();
+            const duration = newAccountDurationSelect.value;
+            const userType = newAccountTypeSelect.value;
+            
+            if (!phone || !email || !duration || !userType) {
+                showMessage("Lütfen tüm alanları doldurunuz.", 'info');
+                return;
+            }
+            
+            submitNewAccountRequestButton.disabled = true;
+            submitNewAccountRequestButton.textContent = "Talep Gönderiliyor...";
+            
+            try {
+                const requestData = {
+                    phoneNumber: phone,
+                    email: email,
+                    requestDuration: duration,
+                    userType: userType,
+                    requestDate: new Date().toISOString(),
+                    status: 'Beklemede',
+                };
+                
+                await addDoc(collection(db, `artifacts/${appId}/public/data/new_account_requests`), requestData);
+                
+                showMessage(`Hesap oluşturma talebiniz başarıyla gönderildi. En kısa sürede size dönüş yapılacaktır.`, 'success');
+                
+                newAccountPhoneInput.value = '';
+                newAccountEmailInput.value = '';
+                newAccountDurationSelect.value = '';
+                newAccountTypeSelect.value = '';
+                
+                // Formu kapat, giriş ekranına dön
+                newAccountRequestContainer.style.display = 'none';
+                loginFormContainer.style.display = 'block';
+                
+
+            } catch (error) {
+                console.error("Yeni hesap talebi gönderme hatası:", error);
+                showMessage(`Talep gönderme hatası: ${error.message}`, 'error');
+            } finally {
+                submitNewAccountRequestButton.disabled = false;
+                submitNewAccountRequestButton.textContent = "Hesap Oluşturma Talebini Gönder";
+            }
+        }
+
+
+        /**
+         * Hesap Uzatma Talebi Gönderir
+         */
+        async function sendRenewalRequest() {
+            if (!currentLoggedInUser) {
+                showMessage("Önce giriş yapmalısınız.", 'error');
+                return;
+            }
+
+            const duration = renewalDurationSelect.value;
+            const phone = phoneNumberInput.value.trim();
+            const userType = renewalUserTypeSelect.value;
+            
+            if (!duration || !phone || !userType) {
+                showMessage("Lütfen uzatma süresi, telefon numaranızı ve üyelik tipinizi seçin.", 'info');
+                return;
+            }
+            
+            sendRenewalRequestButton.disabled = true;
+            sendRenewalRequestButton.textContent = "Talep Gönderiliyor...";
+            
+            try {
+                const requestData = {
+                    username: currentLoggedInUser.iptvUsername,
+                    requestDuration: duration,
+                    phoneNumber: phone,
+                    userTypeConfirmed: userType, 
+                    requestDate: new Date().toISOString(),
+                    status: 'Beklemede',
+                };
+                
+                await addDoc(collection(db, `artifacts/${appId}/public/data/renewal_requests`), requestData);
+                
+                showMessage(`Hesap uzatma talebiniz (${duration}, ${userType}) başarıyla gönderildi.`, 'success');
+                renewalDurationSelect.value = "";
+                phoneNumberInput.value = "";
+                renewalUserTypeSelect.value = "";
+
+            } catch (error) {
+                console.error("Talep gönderme hatası:", error);
+                showMessage(`Talep gönderme hatası: ${error.message}`, 'error');
+            } finally {
+                sendRenewalRequestButton.disabled = false;
+                sendRenewalRequestButton.textContent = "Uzatma Talebini Gönder";
+            }
+        }
+
+
+        /**
+         * Çekilen kullanıcı verilerini ekranda görüntüler
+         */
+        function displayUserData(data) {
+            resultContainer.classList.remove('hidden');
+            
+            const fields = [
+                { label: "Kullanıcı Adı", key: "iptvUsername", copy: true, icon: `<svg class="h-5 w-5 mr-2 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 00-4-4H9a4 4 0 00-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>` },
+                { label: "Şifre", key: "iptvPassword", copy: true, icon: `<svg class="h-5 w-5 mr-2 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path></svg>` },
+                { label: "E-posta", key: "email", icon: `<svg class="h-5 w-5 mr-2 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>` },
+                { label: "Kullanıcı Tipi", key: "userType", highlight: 'text-orange-700 font-bold', icon: `<svg class="h-5 w-5 mr-2 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>` },
+                { label: "Yeni Bağlantı (URL)", key: "newUrl", copy: true, highlight: 'text-red-600 font-bold', icon: `<svg class="h-5 w-5 mr-2 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 015 5v2m-5-2h-3m-6 0H6a5 5 0 00-5 5v2m5-7h3m-6 0h4"></path><line x1="12" y1="18" x2="12" y2="21"></line><line x1="8" y1="21" x2="16" y2="21"></line></svg>` }, 
+                { label: "Üyelik Bitiş Tarihi", key: "expirationDate", icon: `<svg class="h-5 w-5 mr-2 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>` },
+                { label: "Kullanıcı Türü", key: "accountType", icon: `<svg class="h-5 w-5 mr-2 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"></path><path d="M12 6v6l4 2"></path></svg>` },
+                { label: "Üyelik Süresi", key: "subscriptionPeriod", icon: `<svg class="h-5 w-5 mr-2 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10l3 3m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>` },
+                { label: "Son Giriş", key: "lastLoginDate", icon: `<svg class="h-5 w-5 mr-2 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>`, format: (val) => val ? new Date(val).toLocaleString('tr-TR') : 'Bilinmiyor' }, 
+                { label: "Son Güncelleme", key: "lastUpdate", icon: `<svg class="h-5 w-5 mr-2 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>`, format: (val) => val ? new Date(val).toLocaleString('tr-TR') : 'Bilinmiyor' },
+            ];
+
+            let htmlContent = fields.map(field => {
+                const value = field.format ? field.format(data[field.key]) : data[field.key] || 'Veri Yok';
+                
+                return `
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center p-2 sm:p-3 bg-white rounded-xl shadow-sm border border-gray-100">
+                        <span class="font-medium text-gray-600 w-full sm:w-1/3 flex items-center">
+                            ${field.icon}
+                            ${field.label}:
+                        </span>
+                        <div class="flex items-center w-full sm:w-2/3 mt-1 sm:mt-0">
+                            <code class="flex-grow bg-orange-50 ${field.highlight || 'text-orange-800'} p-2 rounded-md text-sm break-all font-mono">
+                                ${value}
+                                ${field.key === 'expirationDate' ? `<span class="ml-2 font-sans text-xs font-bold ${calculateRemainingDays(value).class}">(${calculateRemainingDays(value).text})</span>` : ''}
+                            </code>
+                            ${field.copy && value !== 'Veri Yok' ? `
+                                <button class="ml-2 p-1 text-orange-600 hover:text-orange-800 focus:outline-none copy-button" data-copy-text="${value}" title="Kopyala">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            userDataDisplay.innerHTML = htmlContent;
+
+            // QR Code Generation
+            const urlValue = data.newUrl || 'URL Yok';
+            if (urlValue !== 'URL Yok' && window.QRCode) {
+                const qrCodeHtml = `
+                    <div class="p-4 sm:p-6 bg-white rounded-xl shadow-md border border-gray-100 mt-4 text-center">
+                        <h4 class="font-bold text-lg text-orange-700 mb-3 flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12" y2="18"></line><line x1="12" y1="6" x2="12" y2="6"></line><line x1="6" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="18" y2="12"></line></svg>
+                            Bağlantı URL'si QR Kodu
+                        </h4>
+                        <div id="qrcodeDisplay" class="p-2 inline-block border-4 border-orange-500 rounded-lg"></div>
+                        <p class="text-xs text-gray-500 mt-2">Oynatıcınıza taratarak URL'yi kolayca aktarabilirsiniz.</p>
+                    </div>
+                `;
+                userDataDisplay.insertAdjacentHTML('beforeend', qrCodeHtml);
+
+                document.getElementById('qrcodeDisplay').innerHTML = '';
+                new QRCode(document.getElementById("qrcodeDisplay"), {
+                    text: urlValue,
+                    width: 128,
+                    height: 128,
+                    colorDark : "#f97316", 
+                    colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.H
+                });
+            }
+
+
+            document.querySelectorAll('.copy-button').forEach(button => {
+                button.onclick = (e) => {
+                    const textToCopy = e.currentTarget.getAttribute('data-copy-text');
+                    copyToClipboard(textToCopy);
+                };
+            });
+        }
+
+        /**
+         * Metni panoya kopyalar
+         */
+        function copyToClipboard(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed'; 
+            document.body.appendChild(textarea);
+            textarea.select();
+            
+            try {
+                document.execCommand('copy'); 
+                showMessage('Değer başarıyla panoya kopyalandı!', 'success');
+            } catch (err) {
+                console.error('Kopyalama başarısız:', err);
+                showMessage('Kopyalama başarısız oldu.', 'error');
+            }
+            document.body.removeChild(textarea);
+        }
+
+        /**
+         * Tekil URL Güncelleme (Yurtiçi/Yurtdışı)
+         */
+        async function updateSingleGlobalUrl(type) {
+            if (adminView.style.display === 'none') {
+                showMessage("Yetkisiz erişim.", 'error');
+                return;
+            }
+
+            const inputEl = (type === 'domestic') ? globalDomesticUrlInput : globalInternationalUrlInput;
+            const buttonEl = (type === 'domestic') ? updateDomesticUrlButton : updateInternationalUrlButton;
+            const urlKey = (type === 'domestic') ? 'domestic' : 'international';
+            const label = (type === 'domestic') ? 'Yurtiçi' : 'Yurtdışı';
+
+            const newUrl = inputEl.value.trim();
+
+            if (!newUrl.startsWith('http')) {
+                showMessage(`Lütfen geçerli bir ${label} URL'si (http/https) giriniz.`, 'info');
+                return;
+            }
+
+            buttonEl.disabled = true;
+            buttonEl.textContent = ` ${label} Güncelleniyor...`;
+
+            try {
+                const globalUrlRef = doc(db, `artifacts/${appId}/public/data/settings`, 'global');
+                
+                await setDoc(globalUrlRef, { 
+                    [urlKey]: newUrl,
+                    lastUpdate: new Date().toISOString() 
+                }, { merge: true });
+                
+                await fetchGlobalUrl();
+                showMessage(`${label} URL başarıyla güncellendi!`, 'success');
+
+            } catch (error) {
+                console.error(`URL güncelleme hatası (${label}):`, error);
+                showMessage(`URL güncelleme hatası: ${error.message}`, 'error');
+            } finally {
+                buttonEl.disabled = false;
+                buttonEl.textContent = `${label} URL'yi Güncelle`;
+            }
+        }
+        
+        /**
+         * Tekil Kullanıcı Ekler/Günceller
+         */
+        async function singleAddUser() {
+            if (adminView.style.display === 'none') {
+                showMessage("Yetkisiz erişim. Lütfen Yönetici olarak giriş yapın.", 'error');
+                return;
+            }
+
+            const username = singleUsernameInput.value.trim();
+            const password = singlePasswordInput.value.trim();
+            const expiryDate = singleExpiryDateInput.value.trim();
+            const email = singleEmailInput.value.trim(); 
+            const userType = singleUserTypeSelect.value;
+            const accountType = singleAccountTypeInput.value.trim();
+            const subscriptionPeriod = singleSubscriptionPeriodInput.value.trim();
+
+            if (!username || !password || !expiryDate || !userType || !accountType || !subscriptionPeriod) {
+                showMessage("Lütfen zorunlu tüm alanları doldurun (Kullanıcı Adı, Şifre, Bitiş Tarihi, Tip, Süre, Kullanım Alanı).", 'error');
+                return;
+            }
+
+            singleAddUserButton.disabled = true;
+            singleAddUserButton.textContent = "Kullanıcı Kaydediliyor...";
+
+            const userRef = doc(db, `artifacts/${appId}/public/data/iptv_users`, username);
+
+            try {
+                const userData = {
+                    iptvUsername: username,
+                    iptvPassword: password,
+                    expirationDate: expiryDate,
+                    accountType: accountType,
+                    subscriptionPeriod: subscriptionPeriod,
+                    userType: userType,
+                    email: email, 
+                    lastLoginDate: new Date().toISOString(), 
+                    lastUpdate: new Date().toISOString()
+                };
+
+                await setDoc(userRef, userData, { merge: true });
+                showMessage(`'${username}' kullanıcısı başarıyla kaydedildi/güncellendi.`, 'success');
+
+                // Formu temizle
+                singleUsernameInput.value = '';
+                singlePasswordInput.value = '';
+                singleExpiryDateInput.value = '';
+                singleEmailInput.value = '';
+                singleAccountTypeInput.value = '';
+                singleSubscriptionPeriodInput.value = '';
+
+                fetchAllUsers(); // Listeyi ve metrikleri yenile
+                
+            } catch (error) {
+                console.error(`Tekil kullanıcı ekleme hatası:`, error);
+                showMessage(`Tekil kullanıcı ekleme hatası: ${error.message}`, 'error');
+            } finally {
+                singleAddUserButton.disabled = false;
+                singleAddUserButton.textContent = "Yeni Kullanıcıyı Kaydet";
+            }
+        }
+
+        /**
+         * Seçili Kullanıcıyı Günceller (YENİ)
+         */
+        async function updateSelectedUser() {
+            const username = editUserSelect.value;
+            if (!username) {
+                showMessage("Lütfen düzenlemek için bir kullanıcı seçin.", 'info');
+                return;
+            }
+
+            const updatedData = {
+                iptvPassword: editPasswordInput.value.trim(),
+                expirationDate: editExpiryDateInput.value.trim(),
+                email: editEmailInput.value.trim(),
+                userType: editUserTypeSelect.value,
+                accountType: editAccountTypeInput.value.trim(),
+                subscriptionPeriod: editSubscriptionPeriodInput.value.trim(),
+                lastUpdate: new Date().toISOString()
+            };
+
+            if (!updatedData.iptvPassword || !updatedData.expirationDate) {
+                showMessage("Şifre ve Bitiş Tarihi alanları boş bırakılamaz.", 'error');
+                return;
+            }
+
+            updateUserButton.disabled = true;
+            updateUserButton.textContent = "Güncelleniyor...";
+
+            try {
+                const userRef = doc(db, `artifacts/${appId}/public/data/iptv_users`, username);
+                await setDoc(userRef, updatedData, { merge: true });
+
+                showMessage(`'${username}' kullanıcısı başarıyla güncellendi.`, 'success');
+                await fetchAllUsers(true); // Listeyi, metrikleri ve düzenleme formunu yenile
+
+            } catch (error) {
+                console.error(`Kullanıcı güncelleme hatası:`, error);
+                showMessage(`Kullanıcı güncelleme hatası: ${error.message}`, 'error');
+            } finally {
+                updateUserButton.disabled = false;
+                updateUserButton.textContent = "Kullanıcıyı Güncelle";
+            }
+        }
+
+        /**
+         * Seçili Kullanıcıyı Siler (YENİ)
+         */
+        async function deleteSelectedUser() {
+            const username = editUserSelect.value;
+            if (!username) {
+                showMessage("Lütfen silmek için bir kullanıcı seçin.", 'info');
+                return;
+            }
+
+            if (!confirm(`'${username}' kullanıcısını kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.`)) {
+                return;
+            }
+
+            deleteUserButton.disabled = true;
+            deleteUserButton.textContent = "Siliniyor...";
+
+            try {
+                const userRef = doc(db, `artifacts/${appId}/public/data/iptv_users`, username);
+                await deleteDoc(userRef);
+
+                showMessage(`'${username}' kullanıcısı başarıyla silindi.`, 'success');
+                
+                editUserForm.classList.add('hidden'); // Formu gizle
+                await fetchAllUsers(true); // Listeyi, metrikleri ve düzenleme formunu yenile
+
+            } catch (error) {
+                console.error(`Kullanıcı silme hatası:`, error);
+                showMessage(`Kullanıcı silme hatası: ${error.message}`, 'error');
+            } finally {
+                deleteUserButton.disabled = false;
+                deleteUserButton.textContent = "Kullanıcıyı Sil";
+            }
+        }
+
+        /**
+         * Kullanıcıyı doğrudan listeden siler (YENİ)
+         */
+        async function deleteUserFromList(username) {
+            if (!username) {
+                showMessage("Silinecek kullanıcı adı belirtilmedi.", 'error');
+                return;
+            }
+
+            if (!confirm(`'${username}' kullanıcısını kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.`)) {
+                return;
+            }
+
+            // Butonları geçici olarak devre dışı bırak
+            document.querySelectorAll('.list-delete-button, .list-edit-button').forEach(b => b.disabled = true);
+
+            try {
+                const userRef = doc(db, `artifacts/${appId}/public/data/iptv_users`, username);
+                await deleteDoc(userRef);
+
+                showMessage(`'${username}' kullanıcısı başarıyla silindi.`, 'success');
+                await fetchAllUsers(true); // Listeyi, metrikleri ve düzenleme formunu yenile
+
+            } catch (error) {
+                console.error(`Kullanıcı silme hatası:`, error);
+                showMessage(`Kullanıcı silme hatası: ${error.message}`, 'error');
+                document.querySelectorAll('.list-delete-button, .list-edit-button').forEach(b => b.disabled = false);
+            }
+        }
+
+        /**
+         * Toplu Mesaj Gönderir (YENİ)
+         */
+        async function sendBulkMessage() {
+            const messageContent = bulkMessageInput.value.trim();
+            if (!messageContent) {
+                showMessage("Lütfen gönderilecek bir mesaj yazın.", 'info');
+                return;
+            }
+
+            sendBulkMessageButton.disabled = true;
+            sendBulkMessageButton.textContent = "Gönderiliyor...";
+
+            try {
+                const messageData = {
+                    content: messageContent,
+                    timestamp: new Date().toISOString(),
+                    sender: adminCreds.adminUsername || 'admin'
+                };
+
+                const messagesCollection = collection(db, `artifacts/${appId}/public/data/messages`);
+                await addDoc(messagesCollection, messageData);
+
+                showMessage("Mesaj tüm kullanıcılara başarıyla gönderildi.", 'success');
+                bulkMessageInput.value = '';
+
+                // Arşivi yenile
+                if (adminMessagesView.style.display !== 'none') {
+                    fetchAdminMessages();
+                }
+
+            } catch (error) {
+                console.error("Toplu mesaj gönderme hatası:", error);
+                showMessage(`Mesaj gönderme hatası: ${error.message}`, 'error');
+            } finally {
+                sendBulkMessageButton.disabled = false;
+                sendBulkMessageButton.textContent = "Mesajı Tüm Kullanıcılara Gönder";
+            }
+        }
+
+        /**
+         * Toplu Kullanıcıları ekler (Excel/CSV Simülasyonu)
+         */
+        async function bulkAddUsers() {
+             if (adminView.style.display === 'none') {
+                showMessage("Yetkisiz erişim. Lütfen Yönetici olarak giriş yapın.", 'error');
+                return;
+            }
+            
+            const rawData = bulkUserInput.value.trim();
+            if (!rawData) {
+                showMessage("Lütfen toplu kullanıcı verilerini yapıştırın.", 'info');
+                return;
+            }
+            
+            bulkAddUsersButton.disabled = true;
+            bulkAddUsersButton.textContent = "Kullanıcılar Ekleniyor...";
+
+            const lines = rawData.split('\n').filter(line => line.trim() !== '');
+            let successCount = 0;
+            let errorCount = 0;
+            const usersCollection = `artifacts/${appId}/public/data/iptv_users`;
+            const defaultLastLogin = new Date().toISOString();
+
+            
+            for (const line of lines) {
+                const parts = line.split(',').map(p => p.trim());
+
+                if (parts.length < 6) { 
+                    console.warn(`Hata: Satır formatı yanlış (en az 6 alan gerekli): ${line}`);
+                    errorCount++;
+                    continue;
+                }
+
+                const [username, password, expirationDate, accountType, subscriptionPeriod, userType] = parts;
+                const validatedUserType = (userType.toUpperCase() === 'YURTDISI') ? 'YURTDISI' : 'YURTICI';
+                const email = parts.length > 6 ? parts[6] : ''; // Opsiyonel 7. alan
+
+                if (!username || !password) {
+                    console.warn(`Hata: Kullanıcı adı veya şifre boş: ${line}`);
+                    errorCount++;
+                    continue;
+                }
+                
+                const userRef = doc(db, usersCollection, username);
+                
+                try {
+                    const userData = {
+                        iptvUsername: username,
+                        iptvPassword: password,
+                        expirationDate: expirationDate,
+                        accountType: accountType,
+                        subscriptionPeriod: subscriptionPeriod,
+                        userType: validatedUserType,
+                        email: email, 
+                        lastLoginDate: defaultLastLogin, 
+                        lastUpdate: new Date().toISOString()
+                    };
+
+                    await setDoc(userRef, userData, { merge: true });
+                    successCount++;
+                } catch (error) {
+                    console.error(`Kullanıcı '${username}' eklenirken hata:`, error);
+                    errorCount++;
+                }
+            }
+            
+            bulkAddUsersButton.disabled = false;
+            bulkAddUsersButton.textContent = "Toplu Kullanıcıları Ekle";
+
+            if (successCount > 0) {
+                showMessage(`${successCount} kullanıcı başarıyla eklendi/güncellendi. Hata: ${errorCount}`, 'success');
+                bulkUserInput.value = '';
+                fetchAllUsers(); // Listeyi ve metrikleri yenile
+            } else if (errorCount > 0) {
+                showMessage(`Tüm kullanıcılar eklenirken hata oluştu. Hata sayısı: ${errorCount}`, 'error');
+            } else {
+                showMessage('Hiçbir veri işlenmedi.', 'info');
+            }
+        }
+        
+        /**
+         * Dashboard Metriklerini Hesaplar
+         */
+        async function calculateMetrics(users) {
+            const now = new Date();
+            const expiringSoonDate = new Date();
+            expiringSoonDate.setDate(now.getDate() + 30); // 30 gün sonrası
+            
+            let activeUsers = 0;
+            let expiringSoon = 0;
+            let expiredUsers = 0;
+            let newUsersLast7Days = 0; // YENİ
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(now.getDate() - 7);
+
+            users.forEach(user => {
+                const expiry = new Date(user.expirationDate);
+                
+                if (expiry > now) {
+                    activeUsers++;
+                } else {
+                    expiredUsers++;
+                }
+                
+                // YENİ: Son 7 gün içinde eklenen kullanıcılar
+                const userCreationDate = new Date(user.lastLoginDate || user.lastUpdate); // lastLoginDate veya lastUpdate kullanılabilir
+                if (userCreationDate >= sevenDaysAgo && userCreationDate <= now) {
+                    newUsersLast7Days++;
+                }
+
+                if (expiry > now && expiry <= expiringSoonDate) {
+                    expiringSoon++;
+                }
+            });
+
+            metricActiveUsersEl.textContent = activeUsers;
+            metricExpiringSoonEl.textContent = expiringSoon;
+            metricExpiredEl.textContent = expiredUsers;
+            metricNewUsersLast7DaysEl.textContent = newUsersLast7Days; // YENİ
+        }
+
+        /**
+         * Tüm kullanıcıları Firestore'dan çeker ve Admin UI'da listeler.
+         * @param {boolean} updateMetrics - Metrikleri de güncellemek için true
+         */
+        async function fetchAllUsers(updateMetrics = false) {
+             if (adminView.style.display === 'none' && !updateMetrics) return;
+
+            listStatusEl.textContent = "Kullanıcılar yükleniyor...";
+            userListContent.innerHTML = '';
+            userCountEl.textContent = '0';
+            refreshUserListButton.disabled = true;
+            paginationControlsEl.innerHTML = ''; // Sayfalama kontrolünü sıfırla
+            allUsersData = [];
+
+            try {
+                const usersCollectionRef = collection(db, `artifacts/${appId}/public/data/iptv_users`);
+                const querySnapshot = await getDocs(usersCollectionRef);
+
+                querySnapshot.forEach((doc) => {
+                    allUsersData.push(doc.data());
+                });
+
+                userCountEl.textContent = allUsersData.length;
+
+                // --- Sayfalama sıfırlama ---
+                currentPage = 1; 
+
+                if (allUsersData.length === 0) {
+                    listStatusEl.textContent = "Sistemde kayıtlı kullanıcı bulunmamaktadır.";
+                    userListContent.appendChild(listStatusEl);
+                } else {
+                    listStatusEl.classList.add('hidden');
+                    displayFilteredUsers(allUsersData);
+                }
+                
+                if (updateMetrics) {
+                    calculateMetrics(allUsersData);
+                    fetchRenewalRequests();
+                    fetchNewAccountRequests();
+                    populateEditUserDropdown(); // Düzenleme dropdown'ını doldur
+                } else {
+                    populateEditUserDropdown(); // Sadece dropdown'ı doldur
+                }
+
+
+            } catch (error) {
+                console.error("Kullanıcı listesi çekme hatası:", error);
+                listStatusEl.textContent = `Liste yüklenirken bir hata oluştu: ${error.message}`;
+                listStatusEl.classList.remove('hidden');
+                userListContent.appendChild(listStatusEl);
+            } finally {
+                refreshUserListButton.disabled = false;
+            }
+        }
+
+        /**
+         * Kullanıcı Düzenleme Dropdown'ını Doldurur (YENİ)
+         */
+        function populateEditUserDropdown() {
+            editUserSelect.innerHTML = '<option value="">-- Kullanıcı Seçin --</option>';
+            allUsersData
+                .sort((a, b) => a.iptvUsername.localeCompare(b.iptvUsername))
+                .forEach(user => {
+                    const option = document.createElement('option');
+                    option.value = user.iptvUsername;
+                    option.textContent = user.iptvUsername;
+                    editUserSelect.appendChild(option);
+                });
+        }
+
+        /**
+         * Düzenleme için kullanıcı seçildiğinde formu doldurur (YENİ)
+         */
+        function handleEditUserSelect() {
+            const selectedUsername = editUserSelect.value;
+            if (!selectedUsername) {
+                editUserForm.classList.add('hidden');
+                return;
+            }
+
+            const user = allUsersData.find(u => u.iptvUsername === selectedUsername);
+            if (user) {
+                editPasswordInput.value = user.iptvPassword || '';
+                editExpiryDateInput.value = user.expirationDate || '';
+                editEmailInput.value = user.email || '';
+                editAccountTypeInput.value = user.accountType || '';
+                editSubscriptionPeriodInput.value = user.subscriptionPeriod || '';
+                
+                // User Type select'ini doldur ve seç
+                editUserTypeSelect.innerHTML = '<option value="YURTICI">Yurtiçi</option><option value="YURTDISI">Yurtdışı</option>';
+                editUserTypeSelect.value = user.userType || 'YURTICI';
+
+                editUserForm.classList.remove('hidden');
+            }
+        }
+        
+        /**
+         * Kullanıcıları filtreler ve listeyi yeniden çizer (Sayfalama Eklendi)
+         */
+        function displayFilteredUsers(users) {
+            const searchTerm = userSearchInput.value.toLowerCase();
+            const filteredUsers = users.filter(user => 
+                user.iptvUsername.toLowerCase().includes(searchTerm)
+            );
+            
+            // Sayfalama Hesaplamaları
+            totalPages = Math.ceil(filteredUsers.length / USERS_PER_PAGE);
+            
+            // Eğer arama sonucu yoksa veya sayfa numarası çok büyükse, sıfırla
+            if (currentPage > totalPages && totalPages > 0) {
+                currentPage = totalPages;
+            } else if (totalPages === 0) {
+                 currentPage = 1;
+            }
+
+            const startIndex = (currentPage - 1) * USERS_PER_PAGE;
+            const endIndex = startIndex + USERS_PER_PAGE;
+            const usersToDisplay = filteredUsers.slice(startIndex, endIndex);
+
+            if (usersToDisplay.length === 0 && filteredUsers.length > 0) {
+                // Eğer son sayfada kullanıcı yoksa (örneğin silinme sonrası), bir önceki sayfaya git
+                currentPage = Math.max(1, currentPage - 1);
+                displayFilteredUsers(users); // Yeniden çağır
+                return;
+            }
+
+            if (filteredUsers.length === 0) {
+                userListContent.innerHTML = `<p class="text-center p-4 text-gray-500">Aranan kritere uygun kullanıcı bulunamadı.</p>`;
+                renderPaginationControls(0, 0); // Sayfalama kontrolünü sıfırla
+                return;
+            }
+
+            // Liste içeriğini oluştur
+            const listHtml = usersToDisplay.map(user => {
+                const isExpired = new Date(user.expirationDate) < new Date();
+                const statusClass = isExpired ? 'bg-red-500' : 'bg-green-500';
+                const statusText = isExpired ? 'DOLDU' : 'AKTİF';
+                const typeClass = user.userType === 'YURTDISI' ? 'text-orange-700 bg-orange-200' : 'text-blue-700 bg-blue-200';
+                const remainingDaysInfo = calculateRemainingDays(user.expirationDate);
+
+                // Mobil için kart yapısı, masaüstü için satır yapısı
+                return `
+                    <div class="user-row p-3 sm:p-2 border-b border-gray-200 flex flex-col sm:flex-row text-sm justify-between sm:items-center transition-colors duration-150">
+                        <div class="w-full sm:w-1/4 truncate mb-2 sm:mb-0">
+                            <p class="font-semibold">${user.iptvUsername}</p>
+                            <p class="text-xs text-gray-500">Şifre: ${user.iptvPassword}</p>
+                        </div>
+                        <div class="w-full flex sm:w-3/4 justify-between items-center">
+                            <span class="sm:w-1/4 sm:text-center"><span class="sm:hidden font-bold">Tip: </span><span class="${typeClass} font-medium px-2 py-0.5 rounded">${user.userType || 'BİLİNMİYOR'}</span></span>
+                            <span class="sm:w-1/3 text-center text-gray-600"><span class="sm:hidden font-bold">Bitiş: </span>${user.expirationDate} <span class="text-xs ${remainingDaysInfo.class}">(${remainingDaysInfo.text})</span></span>
+                            <div class="sm:w-1/4 text-center">
+                                <span class="text-xs font-bold ${statusClass} text-white px-2 py-1 sm:py-0.5 rounded">${statusText}</span>
+                            </div>
+                            <div class="sm:w-1/4 text-right flex justify-end items-center space-x-2 mt-2 sm:mt-0">
+                                <button title="Düzenle" data-username="${user.iptvUsername}" class="list-edit-button p-1 text-blue-600 hover:bg-blue-100 rounded-full transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                </button>
+                                <button title="Sil" data-username="${user.iptvUsername}" class="list-delete-button p-1 text-red-600 hover:bg-red-100 rounded-full transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            userListContent.innerHTML = listHtml;
+            renderPaginationControls(currentPage, totalPages);
+
+            // Butonlara olay dinleyicileri ekle
+            document.querySelectorAll('.list-edit-button').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const username = e.currentTarget.dataset.username;
+                    showAdminView('managementTools');
+                    // Akordiyonu aç
+                    const detailsElement = editUserSelect.closest('details');
+                    if (detailsElement) detailsElement.open = true;
+                    // Kullanıcıyı seç ve formu doldur
+                    editUserSelect.value = username;
+                    handleEditUserSelect();
+                });
+            });
+
+            document.querySelectorAll('.list-delete-button').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const username = e.currentTarget.dataset.username;
+                    deleteUserFromList(username);
+                });
+            });
+        }
+        
+        /**
+         * Sayfalama kontrollerini çizer
+         */
+        function renderPaginationControls(current, total) {
+            
+            if (total <= 1) {
+                paginationControlsEl.innerHTML = '';
+                return;
+            }
+
+            paginationControlsEl.innerHTML = `
+                <button id="prevPageButton" 
+                        class="py-1 px-3 bg-orange-500 text-white rounded-lg text-sm disabled:opacity-50 transition-colors"
+                        ${current <= 1 ? 'disabled' : ''}>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    Önceki
+                </button>
+                <span class="text-sm font-semibold text-gray-700">
+                    Sayfa ${current} / ${total}
+                </span>
+                <button id="nextPageButton" 
+                        class="py-1 px-3 bg-orange-500 text-white rounded-lg text-sm disabled:opacity-50 transition-colors"
+                        ${current >= total ? 'disabled' : ''}>
+                    Sonraki
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+            `;
+
+            document.getElementById('prevPageButton').onclick = () => changePage(-1);
+            document.getElementById('nextPageButton').onclick = () => changePage(1);
+        }
+        
+        /**
+         * Sayfayı değiştirir ve listeyi yeniler
+         */
+        function changePage(direction) {
+            const newPage = currentPage + direction;
+            if (newPage >= 1 && newPage <= totalPages) {
+                currentPage = newPage;
+                displayFilteredUsers(allUsersData);
+                // Listenin başına kaydır
+                document.getElementById('userListContainer').scrollTop = 0;
+            }
+        }
+
+
+        
+        /**
+         * Hesap Uzatma Taleplerini çeker ve Admin UI'da listeler.
+         */
+        async function fetchRenewalRequests() {
+             if (adminView.style.display === 'none') return;
+
+            requestStatusEl.textContent = "Talepler yükleniyor...";
+            renewalRequestsList.innerHTML = '';
+            requestCountEl.textContent = '0 Yeni';
+            refreshRequestsButton.disabled = true;
+            requestStatusEl.classList.remove('hidden');
+
+            try {
+                const requestsCollectionRef = collection(db, `artifacts/${appId}/public/data/renewal_requests`);
+                const querySnapshot = await getDocs(requestsCollectionRef);
+
+                let requests = [];
+                querySnapshot.forEach((doc) => {
+                    requests.push({ id: doc.id, ...doc.data() });
+                });
+                
+                requests.sort((a, b) => new Date(b.requestDate) - new Date(a.requestDate));
+
+                requestCountEl.textContent = `${requests.length} Talep`;
+                metricRenewalRequestsEl.textContent = requests.length; 
+
+                if (requests.length === 0) {
+                    requestStatusEl.textContent = "Mevcut üyelik uzatma talebi bulunmamaktadır.";
+                    renewalRequestsList.appendChild(requestStatusEl);
+                    return;
+                }
+
+                requestStatusEl.classList.add('hidden');
+                
+                const listHtml = requests.map(req => {
+                    const statusClass = req.status === 'Beklemede' ? 'bg-yellow-200 text-yellow-800' : 'bg-green-200 text-green-800';
+                    const typeClass = req.userTypeConfirmed === 'YURTDISI' ? 'bg-orange-200 text-orange-800' : 'bg-blue-200 text-blue-800';
+                    const phoneDisplay = req.phoneNumber ? `<p class="text-xs text-gray-700 font-semibold">Tel: ${req.phoneNumber}</p>` : '';
+
+                    return `
+                        <div class="p-3 border-b border-gray-100 flex justify-between items-center hover:bg-gray-100 transition-colors duration-150">
+                            <div>
+                                <p class="font-bold text-gray-800">Kullanıcı: ${req.username}</p>
+                                <p class="text-sm text-orange-600 font-semibold">Süre: ${req.requestDuration}</p>
+                                ${phoneDisplay}
+                                <p class="text-xs text-gray-500">${new Date(req.requestDate).toLocaleString('tr-TR')}</p>
+                            </div>
+                            <div class="text-right flex flex-col items-end space-y-1">
+                                <span class="text-xs font-bold ${typeClass} px-2 py-0.5 rounded-full">${req.userTypeConfirmed || 'BİLİNMİYOR'}</span>
+                                <span class="text-xs font-bold ${statusClass} px-2 py-0.5 rounded-full">${req.status}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                renewalRequestsList.innerHTML = listHtml;
+
+            } catch (error) {
+                console.error("Talep listesi çekme hatası:", error);
+                requestStatusEl.textContent = `Liste yüklenirken bir hata oluştu: ${error.message}`;
+                requestStatusEl.classList.remove('hidden');
+            } finally {
+                refreshRequestsButton.disabled = false;
+            }
+        }
+        
+        /**
+         * Yeni Hesap Oluşturma Taleplerini çeker ve Admin UI'da listeler.
+         */
+        async function fetchNewAccountRequests() {
+             if (adminView.style.display === 'none') return;
+
+            newAccountRequestStatusEl.textContent = "Talepler yükleniyor...";
+            newAccountRequestsList.innerHTML = '';
+            newAccountRequestCountEl.textContent = '0 Yeni';
+            refreshNewAccountRequestsButton.disabled = true;
+            newAccountRequestStatusEl.classList.remove('hidden');
+            newAccountRequestsData = [];
+
+            try {
+                const requestsCollectionRef = collection(db, `artifacts/${appId}/public/data/new_account_requests`);
+                const querySnapshot = await getDocs(requestsCollectionRef);
+
+                querySnapshot.forEach((doc) => {
+                    newAccountRequestsData.push({ id: doc.id, ...doc.data() });
+                });
+                
+                newAccountRequestsData.sort((a, b) => new Date(b.requestDate) - new Date(a.requestDate));
+
+                newAccountRequestCountEl.textContent = `${newAccountRequestsData.length} Talep`;
+                metricNewAccountRequestsEl.textContent = newAccountRequestsData.length; 
+
+                if (newAccountRequestsData.length === 0) {
+                    newAccountRequestStatusEl.textContent = "Yeni hesap oluşturma talebi bulunmamaktadır.";
+                    newAccountRequestsList.appendChild(newAccountRequestStatusEl);
+                    return;
+                }
+
+                newAccountRequestStatusEl.classList.add('hidden');
+                
+                const listHtml = newAccountRequestsData.map(req => {
+                    const statusClass = req.status === 'Beklemede' ? 'bg-yellow-200 text-yellow-800' : 'bg-green-200 text-green-800';
+                    const typeClass = req.userType === 'YURTDISI' ? 'bg-orange-200 text-orange-800' : 'bg-blue-200 text-blue-800';
+                    const contactInfo = `<p class="text-xs text-gray-700 font-semibold">Tel: ${req.phoneNumber} | E-posta: ${req.email || 'Yok'}</p>`;
+
+                    return `
+                        <div class="p-3 border-b border-gray-100 flex justify-between items-center hover:bg-gray-100 transition-colors duration-150">
+                            <div>
+                                <p class="font-bold text-gray-800">Süre: ${req.requestDuration}</p>
+                                ${contactInfo}
+                                <p class="text-xs text-gray-500">${new Date(req.requestDate).toLocaleString('tr-TR')}</p>
+                            </div>
+                            <div class="text-right flex flex-col items-end space-y-1">
+                                <span class="text-xs font-bold ${typeClass} px-2 py-0.5 rounded-full mb-2">${req.userType || 'BİLİNMİYOR'}</span>
+                                <button data-request-id="${req.id}" 
+                                        data-phone="${req.phoneNumber}" 
+                                        data-email="${req.email}"
+                                        data-duration="${req.requestDuration}"
+                                        data-usertype="${req.userType}"
+                                        class="approve-button py-1 px-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs font-semibold">
+                                    Kaydet / Onayla
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                newAccountRequestsList.innerHTML = listHtml;
+                
+                // Onay butonlarına dinleyici ekle
+                document.querySelectorAll('.approve-button').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const data = e.currentTarget.dataset;
+                        openAccountApprovalModal({
+                            id: data.requestId,
+                            phoneNumber: data.phone,
+                            email: data.email,
+                            requestDuration: data.duration,
+                            userType: data.usertype
+                        });
+                    });
+                });
+
+            } catch (error) {
+                console.error("Yeni hesap talebi listesi çekme hatası:", error);
+                newAccountRequestStatusEl.textContent = `Liste yüklenirken bir hata oluştu: ${error.message}`;
+                newAccountRequestStatusEl.classList.remove('hidden');
+            } finally {
+                refreshNewAccountRequestsButton.disabled = false;
+            }
+        }
+
+        /**
+         * Yönetici için gönderilen mesajları çeker ve listeler (YENİ)
+         */
+        async function fetchAdminMessages() {
+            adminMessagesList.innerHTML = '<p class="text-center p-4 text-gray-500">Mesajlar yükleniyor...</p>';
+            refreshMessagesButton.disabled = true;
+
+            try {
+                const messagesCollectionRef = collection(db, `artifacts/${appId}/public/data/messages`);
+                const querySnapshot = await getDocs(messagesCollectionRef);
+
+                allMessages = [];
+                querySnapshot.forEach((doc) => {
+                    allMessages.push({ id: doc.id, ...doc.data() });
+                });
+
+                allMessages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                if (allMessages.length === 0) {
+                    adminMessagesList.innerHTML = '<p class="text-center p-4 text-gray-500">Henüz gönderilmiş mesaj yok.</p>';
+                    return;
+                }
+
+                const listHtml = allMessages.map(msg => `
+                    <div class="p-3 border-b border-gray-200 bg-white">
+                        <div class="flex justify-between items-start">
+                            <p class="text-sm text-gray-800 whitespace-pre-wrap">${msg.content}</p>
+                            <button data-message-id="${msg.id}" class="delete-message-button ml-4 p-1 text-red-500 hover:text-red-700">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path></svg>
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">Gönderim: ${new Date(msg.timestamp).toLocaleString('tr-TR')}</p>
+                    </div>
+                `).join('');
+
+                adminMessagesList.innerHTML = listHtml;
+
+                // Silme butonlarına olay dinleyici ekle
+                document.querySelectorAll('.delete-message-button').forEach(button => {
+                    button.addEventListener('click', async (e) => {
+                        const messageId = e.currentTarget.dataset.messageId;
+                        if (confirm("Bu mesajı kalıcı olarak silmek istediğinizden emin misiniz?")) {
+                            try {
+                                await deleteDoc(doc(db, `artifacts/${appId}/public/data/messages`, messageId));
+                                showMessage("Mesaj başarıyla silindi.", 'success');
+                                fetchAdminMessages(); // Listeyi yenile
+                            } catch (error) {
+                                showMessage(`Mesaj silinirken hata: ${error.message}`, 'error');
+                            }
+                        }
+                    });
+                });
+
+            } catch (error) {
+                console.error("Mesaj arşivi çekme hatası:", error);
+                adminMessagesList.innerHTML = `<p class="text-center p-4 text-red-500">Mesajlar yüklenirken hata oluştu.</p>`;
+            } finally {
+                refreshMessagesButton.disabled = false;
+            }
+        }
+
+        /**
+         * Kullanıcı için mesajları çeker ve görüntüler (YENİ)
+         */
+        async function displayUserMessages() {
+            if (!isAuthReady) return;
+
+            try {
+                const messagesCollectionRef = collection(db, `artifacts/${appId}/public/data/messages`);
+                const querySnapshot = await getDocs(messagesCollectionRef);
+
+                const messages = [];
+                querySnapshot.forEach(doc => messages.push({ id: doc.id, ...doc.data() }));
+                messages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                // Kullanıcının okuduğu mesajları localStorage'dan al
+                const readMessages = JSON.parse(localStorage.getItem('readMessages') || '[]');
+                const unreadMessages = messages.filter(msg => !readMessages.includes(msg.id));
+
+                if (unreadMessages.length === 0) {
+                    userMessagesContainer.innerHTML = '<p class="text-center p-4 text-gray-500">Okunmamış yeni mesajınız bulunmuyor.</p>';
+                    return;
+                }
+
+                const messagesHtml = unreadMessages.map(msg => `
+                    <div id="message-card-${msg.id}" class="p-4 bg-white border-l-4 border-blue-500 rounded-r-lg shadow-sm">
+                        <p class="text-sm text-gray-800 whitespace-pre-wrap">${msg.content}</p>
+                        <div class="flex justify-between items-center mt-3">
+                            <p class="text-xs text-gray-500">${new Date(msg.timestamp).toLocaleString('tr-TR')}</p>
+                            <button data-message-id="${msg.id}" class="delete-user-message-button py-1 px-3 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-semibold">Sil</button>
+                        </div>
+                    </div>
+                `).join('');
+
+                userMessagesContainer.innerHTML = messagesHtml;
+
+                // "Sil" butonlarına olay dinleyici ekle
+                document.querySelectorAll('.delete-user-message-button').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const messageId = e.currentTarget.dataset.messageId;
+                        deleteUserMessage(messageId);
+                    });
+                });
+
+            } catch (error) {
+                console.error("Kullanıcı mesajlarını çekme hatası:", error);
+            }
+        }
+
+        /**
+         * Mesajı kullanıcı için okundu olarak işaretler ve gizler (YENİ)
+         */
+        function deleteUserMessage(messageId) {
+            const readMessages = JSON.parse(localStorage.getItem('readMessages') || '[]');
+            if (!readMessages.includes(messageId)) {
+                readMessages.push(messageId);
+                localStorage.setItem('readMessages', JSON.stringify(readMessages));
+            }
+            const messageCard = document.getElementById(`message-card-${messageId}`);
+            if (messageCard) {
+                messageCard.remove();
+            }
+            // Eğer hiç okunmamış mesaj kalmadıysa kutuyu gizle
+            if (userMessagesContainer.children.length === 0) {
+                userMessagesContainer.innerHTML = '<p class="text-center p-4 text-gray-500">Okunmamış yeni mesajınız bulunmuyor.</p>';
+            }
+        }
+
+
+        // Olay Dinleyicileri
+        loginButton.addEventListener('click', handleMainLogin); 
+        userLogoutButton.addEventListener('click', resetUI);
+        adminLogoutButton.addEventListener('click', resetUI);
+        
+        // Yeni Hesap Talebi Görünümü Kontrolleri
+        showNewAccountFormButton.addEventListener('click', () => {
+            loginFormContainer.style.display = 'none';
+            newAccountRequestContainer.style.display = 'block';
+        });
+        hideNewAccountFormButton.addEventListener('click', () => {
+            newAccountRequestContainer.style.display = 'none';
+            loginFormContainer.style.display = 'block';
+        });
+        submitNewAccountRequestButton.addEventListener('click', submitNewAccountRequest);
+
+        // Modal Olayları
+        closeModalButton.addEventListener('click', closeModal);
+        saveApprovedAccountButton.addEventListener('click', saveApprovedAccount);
+        
+        // URL Güncelleme Butonları (AYRI)
+        updateDomesticUrlButton.addEventListener('click', () => updateSingleGlobalUrl('domestic'));
+        updateInternationalUrlButton.addEventListener('click', () => updateSingleGlobalUrl('international'));
+
+        // Fiyat Güncelleme (YENİ)
+        updatePriceListButton.addEventListener('click', updatePriceList);
+
+        // Kullanıcı Yönetimi
+        singleAddUserButton.addEventListener('click', singleAddUser); 
+        bulkAddUsersButton.addEventListener('click', bulkAddUsers);
+        sendBulkMessageButton.addEventListener('click', sendBulkMessage); // YENİ
+
+        // Kullanıcı Düzenleme/Silme (YENİ)
+        editUserSelect.addEventListener('change', handleEditUserSelect);
+        updateUserButton.addEventListener('click', updateSelectedUser);
+        deleteUserButton.addEventListener('click', deleteSelectedUser);
+
+        // Mesaj Yönetimi (YENİ)
+        refreshMessagesButton.addEventListener('click', fetchAdminMessages);
+        navMessages.addEventListener('click', () => showAdminView('messages'));
+
+        
+        // Kullanıcılar (YENİ SEKME İŞLEMLERİ)
+        refreshUserListButton.addEventListener('click', () => fetchAllUsers(false));
+        
+        // Talep Yönetimi
+        sendRenewalRequestButton.addEventListener('click', sendRenewalRequest);
+        refreshRequestsButton.addEventListener('click', fetchRenewalRequests);
+        refreshNewAccountRequestsButton.addEventListener('click', fetchNewAccountRequests); 
+
+        // Navigasyon
+        navDashboard.addEventListener('click', () => showAdminView('dashboard'));
+        navRegisteredUsers.addEventListener('click', () => showAdminView('registeredUsers')); 
+        navUserManagement.addEventListener('click', () => showAdminView('managementTools')); 
+        navPriceManagement.addEventListener('click', () => showAdminView('priceManagement')); // YENİ
+        navMessages.addEventListener('click', () => showAdminView('messages')); // YENİ
+        navUserInfo.addEventListener('click', () => showUserView('info')); 
+        navUserRenewal.addEventListener('click', () => showUserView('renewal')); 
+        navPriceList.addEventListener('click', () => showUserView('priceList')); // YENİ
+        navUserMessages.addEventListener('click', () => showUserView('messages')); // YENİ
+        
+        // Arama girişinde filtreleme
+        userSearchInput.addEventListener('input', () => {
+             currentPage = 1; // Sayfayı sıfırla
+             displayFilteredUsers(allUsersData);
+        });
+        
+        // Giriş alanları Enter tuşu olayları
+        usernameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') { handleMainLogin(); }
+        });
+        passwordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') { handleMainLogin(); }
+        });
+
+
+        // Uygulamayı Başlat
+        window.onload = initializeFirebase;
+
+    </script>
+</body>
+</html>
