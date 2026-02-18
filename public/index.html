@@ -1784,6 +1784,7 @@
         // Canvas Global Değişkenleri (Gerekli değilse varsayılanı kullanır)
         window.appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const appId = window.appId; // Local reference
+        const ADMIN_NOTIFICATION_EMAIL = 'mersinakpinar@outlook.com'; // Admin bildirim e-posta adresi
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : DEFAULT_FIREBASE_CONFIG;
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         
@@ -2434,7 +2435,7 @@
 
             } catch (error) {
                 console.error(`Kullanıcı kaydetme hatası:`, error);
-                showMessage(`Kullanıcı kaydetme hatası: ${error.message}`, 'error');
+                showMessage('Kullanıcı kaydetme sırasında bir hata oluştu.', 'error');
             } finally {
                 saveApprovedAccountButton.disabled = false;
                 saveApprovedAccountButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg> Kaydet ve Onayla';
@@ -2695,7 +2696,7 @@
 
             } catch (error) {
                 console.error("Fiyat listesi güncelleme hatası:", error);
-                showMessage(`Fiyat listesi güncelleme hatası: ${error.message}`, 'error');
+                showMessage('Fiyat listesi güncellenirken bir hata oluştu.', 'error');
             } finally {
                 updatePriceListButton.disabled = false;
                 updatePriceListButton.textContent = "Fiyat Listesini Güncelle";
@@ -2753,8 +2754,8 @@
 
             } catch (error) {
                 console.error("Firebase başlatma hatası:", error);
-                showMessage(`Sistem hatası: ${error.message}`, 'error');
-                authStatusEl.textContent = `HATA: ${error.message}`;
+                showMessage('Sistem başlatılırken bir hata oluştu. Lütfen sayfayı yenileyin.', 'error');
+                authStatusEl.textContent = 'Bağlantı hatası. Sayfayı yenileyiniz.';
             }
         }
 
@@ -2779,12 +2780,20 @@
                 }
                 
                 if (session.type === 'user' && session.username) {
-                    // Kullanıcı oturumunu geri yükle
+                    // Kullanıcı oturumunu geri yükle (token doğrulamalı)
                     const userRef = doc(db, `artifacts/${appId}/public/data/iptv_users`, session.username);
                     const docSnap = await getDoc(userRef);
                     
                     if (docSnap.exists()) {
                         const data = docSnap.data();
+                        
+                        // Session token doğrulama
+                        if (!session.token || data.sessionToken !== session.token) {
+                            console.warn('Oturum token doğrulaması başarısız, yeniden giriş gerekli.');
+                            sessionStorage.removeItem('iptvSession');
+                            return;
+                        }
+                        
                         if (data.isApproved === false) {
                             sessionStorage.removeItem('iptvSession');
                             return;
@@ -2792,6 +2801,10 @@
                         currentLoggedInUser = data;
                         userWelcomeHeader.textContent = `Hoş Geldiniz, ${data.iptvUsername}!`;
                         displayUserData(data);
+                        
+                        // Güvenlik: Şifreyi bellekten temizle (displayUserData zaten kullandı)
+                        delete currentLoggedInUser.iptvPassword;
+                        
                         loginForm.style.display = 'none';
                         userView.style.display = 'block';
                         showUserView('info');
@@ -2852,13 +2865,14 @@
                     
                     currentLoggedInUser = data;
                     
-                    // Son giriş tarihini güncelle
+                    // Son giriş tarihini güncelle + oturum token'ı oluştur
                     const nowIso = new Date().toISOString();
-                    await setDoc(userRef, { lastLoginDate: nowIso }, { merge: true });
+                    const sessionToken = crypto.randomUUID ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
+                    await setDoc(userRef, { lastLoginDate: nowIso, sessionToken: sessionToken }, { merge: true });
                     data.lastLoginDate = nowIso; 
                     
-                    // Oturumu kaydet
-                    sessionStorage.setItem('iptvSession', JSON.stringify({ type: 'user', username: data.iptvUsername }));
+                    // Oturumu kaydet (token ile)
+                    sessionStorage.setItem('iptvSession', JSON.stringify({ type: 'user', username: data.iptvUsername, token: sessionToken }));
                     
                     // Yeni mesajları kontrol et
                     await checkForNewMessages();
@@ -2866,6 +2880,9 @@
                     // Kullanıcı arayüzünü güncelle
                     userWelcomeHeader.textContent = `Hoş Geldiniz, ${data.iptvUsername}!`;
                     displayUserData(data);
+                    
+                    // Güvenlik: Şifreyi bellekten temizle (displayUserData zaten kullandı)
+                    delete currentLoggedInUser.iptvPassword;
 
                     loginForm.style.display = 'none';
                     userView.style.display = 'block';
@@ -2920,7 +2937,7 @@
                 showMessage(`Hata: Kullanıcı adı veya şifre yanlış. Lütfen kontrol edin.`, 'error');
             } catch (error) {
                 console.error("Giriş hatası:", error);
-                showMessage(`Sistem hatası: ${error.message}`, 'error');
+                showMessage('Giriş sırasında bir hata oluştu. Lütfen tekrar deneyin.', 'error');
             } finally {
                 loginButton.disabled = false;
                 loginButton.textContent = "Giriş Yap";
@@ -2933,11 +2950,9 @@
          */
         function generateRandomCredential(length = 10) {
             const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-            let result = '';
-            for (let i = 0; i < length; i++) {
-                result += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            return result;
+            const array = new Uint32Array(length);
+            crypto.getRandomValues(array);
+            return Array.from(array, v => chars[v % chars.length]).join('');
         }
 
         /**
@@ -3035,8 +3050,6 @@
                 while (generatedPassword === generatedUsername) {
                     generatedPassword = generateRandomCredential(10);
                 }
-                console.log('Üretilen Kullanıcı Adı:', generatedUsername, 'Üretilen Şifre:', generatedPassword, 'Aynı mı:', generatedUsername === generatedPassword);
-                
                 const requestData = {
                     fullName: fullName,
                     phoneNumber: cleanPhone,
@@ -3054,15 +3067,15 @@
                 // Admin'e e-posta bildirimi gönder
                 try {
                     const mailData = {
-                        to: 'mersinakpinar@outlook.com',
+                        to: ADMIN_NOTIFICATION_EMAIL,
                         message: {
                             subject: `🆕 YENİ HESAP TALEBİ - ${fullName}`,
                             html: `<div style="font-family:Arial,sans-serif;max-width:500px;">
                                 <h2 style="color:#ea580c;">🆕 Yeni Hesap Oluşturma Talebi</h2>
                                 <table style="width:100%;border-collapse:collapse;">
-                                    <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:bold;">Ad Soyad:</td><td style="padding:8px;border-bottom:1px solid #eee;">${fullName}</td></tr>
-                                    <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:bold;">Telefon:</td><td style="padding:8px;border-bottom:1px solid #eee;">${cleanPhone}</td></tr>
-                                    <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:bold;">E-posta:</td><td style="padding:8px;border-bottom:1px solid #eee;">${email}</td></tr>
+                                    <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:bold;">Ad Soyad:</td><td style="padding:8px;border-bottom:1px solid #eee;">${escapeHtml(fullName)}</td></tr>
+                                    <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:bold;">Telefon:</td><td style="padding:8px;border-bottom:1px solid #eee;">${escapeHtml(cleanPhone)}</td></tr>
+                                    <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:bold;">E-posta:</td><td style="padding:8px;border-bottom:1px solid #eee;">${escapeHtml(email)}</td></tr>
                                     <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:bold;">Kullanım Alanı:</td><td style="padding:8px;border-bottom:1px solid #eee;">${userType === 'YURTICI' ? '🇹🇷 Yurtiçi' : '🌍 Yurtdışı'}</td></tr>
                                     <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:bold;">İstenen Süre:</td><td style="padding:8px;border-bottom:1px solid #eee;">${duration}</td></tr>
                                     <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:bold;">Oluşturulan Kullanıcı Adı:</td><td style="padding:8px;border-bottom:1px solid #eee;"><strong>${generatedUsername}</strong></td></tr>
@@ -3102,7 +3115,7 @@
 
             } catch (error) {
                 console.error("Yeni hesap talebi gönderme hatası:", error);
-                showMessage(`Talep gönderme hatası: ${error.message}`, 'error');
+                showMessage('Talep gönderilirken bir hata oluştu. Lütfen tekrar deneyin.', 'error');
             } finally {
                 submitNewAccountRequestButton.disabled = false;
                 submitNewAccountRequestButton.textContent = "Hesap Oluşturma Talebini Gönder";
@@ -3156,7 +3169,7 @@
                 // Admin'e e-posta bildirimi gönder
                 try {
                     const mailData = {
-                        to: 'mersinakpinar@outlook.com', // Admin mail adı
+                        to: ADMIN_NOTIFICATION_EMAIL,
                         message: {
                             subject: `📢 YENİ ÜYELİK UZATMA TALEBİ - ${currentLoggedInUser.iptvUsername}`,
                             text: `Yeni bir üyelik uzatma talebi alındı:\n\nKullanıcı: ${currentLoggedInUser.iptvUsername}\nSüre: ${duration}\nTip: ${userType}\nTelefon: ${phone}\nTarih: ${new Date().toLocaleString('tr-TR')}`
@@ -3177,7 +3190,7 @@
 
             } catch (error) {
                 console.error("Talep gönderme hatası:", error);
-                showMessage(`Talep gönderme hatası: ${error.message}`, 'error');
+                showMessage('Uzatma talebi gönderilirken bir hata oluştu. Lütfen tekrar deneyin.', 'error');
             } finally {
                 sendRenewalRequestButton.disabled = false;
                 sendRenewalRequestButton.textContent = "Uzatma Talebini Gönder";
@@ -3436,7 +3449,7 @@
 
             } catch (error) {
                 console.error(`URL güncelleme hatası (${label}):`, error);
-                showMessage(`URL güncelleme hatası: ${error.message}`, 'error');
+                showMessage('URL güncellenirken bir hata oluştu.', 'error');
             } finally {
                 buttonEl.disabled = false;
                 buttonEl.textContent = `${label} URL'yi Güncelle`;
@@ -3483,7 +3496,7 @@
 
             } catch (error) {
                 console.error(`M3U URL güncelleme hatası (${label}):`, error);
-                showMessage(`M3U URL güncelleme hatası: ${error.message}`, 'error');
+                showMessage('M3U URL güncellenirken bir hata oluştu.', 'error');
             } finally {
                 buttonEl.disabled = false;
                 buttonEl.textContent = `${label} M3U URL Güncelle`;
@@ -3549,7 +3562,7 @@
                 
             } catch (error) {
                 console.error(`Tekil kullanıcı ekleme hatası:`, error);
-                showMessage(`Tekil kullanıcı ekleme hatası: ${error.message}`, 'error');
+                showMessage('Kullanıcı eklenirken bir hata oluştu.', 'error');
             } finally {
                 singleAddUserButton.disabled = false;
                 singleAddUserButton.textContent = "Yeni Kullanıcıyı Kaydet";
@@ -3696,7 +3709,7 @@ Keyifli seyirler! 📺`;
                 
             } catch (error) {
                 console.error(`Hızlı kullanıcı ekleme hatası:`, error);
-                showMessage(`Hızlı kullanıcı ekleme hatası: ${error.message}`, 'error');
+                showMessage('Hızlı kullanıcı eklenirken bir hata oluştu.', 'error');
             } finally {
                 quickAddUserButton.disabled = false;
                 quickAddUserButton.textContent = "Kullanıcıyı Ekle ve Şablonu Hazırla";
@@ -3791,7 +3804,7 @@ Keyifli seyirler! 📺`;
                 calculateMetrics(allUsersData);
             } catch (error) {
                 console.error(`Hesap bilgisi güncelleme hatası:`, error);
-                showMessage(`Hata: ${error.message}`, 'error');
+                showMessage('Kullanıcı bilgileri güncellenirken bir hata oluştu.', 'error');
             } finally {
                 updateUserInfoButton.disabled = false;
                 updateUserInfoButton.textContent = "Hesap Bilgisini Güncelle";
@@ -3870,7 +3883,7 @@ Keyifli seyirler! 📺`;
 
             } catch (error) {
                 console.error(`Süre uzatma hatası:`, error);
-                showMessage(`Hata: ${error.message}`, 'error');
+                showMessage('Abonelik uzatılırken bir hata oluştu.', 'error');
             } finally {
                 extendUserButton.disabled = false;
                 extendUserButton.textContent = "Hesap Süresini Uzat & Kaydet";
@@ -3911,7 +3924,7 @@ Keyifli seyirler! 📺`;
 
             } catch (error) {
                 console.error(`Kullanıcı silme hatası:`, error);
-                showMessage(`Kullanıcı silme hatası: ${error.message}`, 'error');
+                showMessage('Kullanıcı silinirken bir hata oluştu.', 'error');
             } finally {
                 deleteUserButton.disabled = false;
                 deleteUserButton.textContent = "Kullanıcıyı Sil";
@@ -3943,7 +3956,7 @@ Keyifli seyirler! 📺`;
 
             } catch (error) {
                 console.error(`Kullanıcı silme hatası:`, error);
-                showMessage(`Kullanıcı silme hatası: ${error.message}`, 'error');
+                showMessage('Kullanıcı silinirken bir hata oluştu.', 'error');
                 document.querySelectorAll('.list-delete-button, .list-edit-button, .list-extend-button').forEach(b => b.disabled = false);
             }
         }
@@ -4024,7 +4037,7 @@ Keyifli seyirler! 📺`;
 
             } catch (error) {
                 console.error("Toplu mesaj gönderme hatası:", error);
-                showMessage(`Mesaj gönderme hatası: ${error.message}`, 'error');
+                showMessage('Mesaj gönderilirken bir hata oluştu.', 'error');
             } finally {
                 sendBulkMessageButton.disabled = false;
                 sendBulkMessageButton.textContent = "Mesajı Tüm Kullanıcılara Gönder";
@@ -4365,7 +4378,7 @@ Keyifli seyirler! 📺`;
                     fetchTestAccounts();
                 } catch (error) {
                     console.error('Test hesabı dönüştürme hatası:', error);
-                    showMessage(`Dönüştürme hatası: ${error.message}`, 'error');
+                    showMessage('Hesap dönüştürülürken bir hata oluştu.', 'error');
                     document.getElementById('confirmConvertBtn').disabled = false;
                     document.getElementById('confirmConvertBtn').textContent = 'Dönüştür';
                 }
@@ -4677,7 +4690,7 @@ Keyifli seyirler! 📺`;
                 
             } catch (error) {
                 console.error("Talep silme hatası:", error);
-                showMessage(`Silme hatası: ${error.message}`, 'error');
+                showMessage('Talep silinirken bir hata oluştu.', 'error');
                 // Hata varsa listeyi yenile
                 fetchRenewalRequests();
             }
@@ -4975,7 +4988,8 @@ Keyifli seyirler! 📺`;
                                 showMessage("Mesaj başarıyla silindi.", 'success');
                                 fetchAdminMessages(); // Listeyi yenile
                             } catch (error) {
-                                showMessage(`Mesaj silinirken hata: ${error.message}`, 'error');
+                                console.error('Mesaj silme hatası:', error);
+                                showMessage('Mesaj silinirken bir hata oluştu.', 'error');
                             }
                         }
                     });
@@ -5189,7 +5203,7 @@ Keyifli seyirler! 📺`;
                 
             } catch (error) {
                 console.error('Mesaj gönderme hatası:', error);
-                showMessage(`Mesaj gönderilemedi: ${error.message}`, 'error');
+                showMessage('Mesaj gönderilemedi. Lütfen tekrar deneyin.', 'error');
             } finally {
                 sendUserMessageButton.disabled = false;
             }
@@ -5395,7 +5409,7 @@ Keyifli seyirler! 📺`;
                 
             } catch (error) {
                 console.error('Admin cevap gönderme hatası:', error);
-                showMessage(`Cevap gönderilemedi: ${error.message}`, 'error');
+                showMessage('Cevap gönderilemedi. Lütfen tekrar deneyin.', 'error');
             } finally {
                 sendAdminReplyButton.disabled = false;
             }
@@ -5553,7 +5567,7 @@ Keyifli seyirler! 📺`;
                 
             } catch (error) {
                 console.error('iyzico ayarları kaydetme hatası:', error);
-                showMessage(`Kaydetme hatası: ${error.message}`, 'error');
+                showMessage('Bilgiler kaydedilirken bir hata oluştu.', 'error');
             } finally {
                 saveBtn.disabled = false;
                 saveBtn.textContent = 'iyzico Ayarlarını Kaydet';
@@ -5725,7 +5739,7 @@ Keyifli seyirler! 📺`;
                 // Admin'e bildirim
                 try {
                     const mailData = {
-                        to: 'mersinakpinar@outlook.com',
+                        to: ADMIN_NOTIFICATION_EMAIL,
                         message: {
                             subject: `💳 YENİ ÖDEME TALEBİ - ${currentLoggedInUser.iptvUsername}`,
                             text: `Online ödeme talebi:\n\nKullanıcı: ${currentLoggedInUser.iptvUsername}\nPaket: ${selectedIyzicoPackage.duration}\nTutar: ${selectedIyzicoPackage.price} ${selectedIyzicoPackage.symbol}\nKart Sonu: **** ${cardNumber.slice(-4)}\nTarih: ${new Date().toLocaleString('tr-TR')}\n\nNOT: iyzico henüz aktif değil. Ödeme talebi beklemede.`
@@ -5749,9 +5763,9 @@ Keyifli seyirler! 📺`;
                 
             } catch (error) {
                 console.error('Ödeme hatası:', error);
-                statusEl.textContent = `Ödeme hatası: ${error.message}`;
+                statusEl.textContent = 'Ödeme işlemi sırasında bir hata oluştu.';
                 statusEl.className = 'text-xs text-center text-red-600 py-2';
-                showMessage(`Ödeme hatası: ${error.message}`, 'error');
+                showMessage('Ödeme işlemi sırasında bir hata oluştu.', 'error');
             } finally {
                 payBtn.disabled = false;
                 payBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg> Güvenli Ödeme Yap`;
