@@ -1,0 +1,110 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===== YARDIMCI FONKSİYONLAR =====
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.admin == true;
+    }
+    
+    // ===== MAIL KOLEKSİYONU =====
+    // Trigger Email Extension için - herkes yazabilir (talep bildirimleri vs), sadece admin okuyabilir
+    match /mail/{document=**} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isAdmin();
+    }
+    
+    // ===== GÜVENLİ KONFİGÜRASYON =====
+    // iyzico API key'leri vs. - sadece Cloud Functions erişebilir (hiçbir client erişemez)
+    match /secure_config/{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===== IPTV KULLANICILARI =====
+    match /artifacts/{appId}/public/data/iptv_users/{userId} {
+      // Herkes kendi kullanıcı adıyla belge okuyabilir (giriş kontrolü için)
+      allow read: if isAuthenticated();
+      // Kullanıcı kendi belgesini kısmen güncelleyebilir (lastLoginDate, dismissedMessages)
+      allow update: if isAuthenticated() 
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['lastLoginDate', 'dismissedMessages']);
+      // Oluşturma ve silme sadece admin
+      allow create, delete: if isAdmin();
+      // Admin tam yazma yetkisi
+      allow update: if isAdmin();
+    }
+    
+    // ===== YENİLEME TALEPLERİ =====
+    match /artifacts/{appId}/public/data/renewal_requests/{requestId} {
+      // Herkes okuyabilir (kendi taleplerini görmek için)
+      allow read: if isAuthenticated();
+      // Giriş yapmış kullanıcılar talep oluşturabilir
+      allow create: if isAuthenticated();
+      // Güncelleme ve silme sadece admin
+      allow update, delete: if isAdmin();
+    }
+    
+    // ===== YENİ HESAP TALEPLERİ =====
+    match /artifacts/{appId}/public/data/new_account_requests/{requestId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+    
+    // ===== MESAJLAR (Broadcast) =====
+    match /artifacts/{appId}/public/data/messages/{messageId} {
+      // Herkes okuyabilir (duyurular)
+      allow read: if isAuthenticated();
+      // Sadece admin yazabilir
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ===== KONUŞMALAR =====
+    match /artifacts/{appId}/public/data/conversations/{conversationId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+    match /artifacts/{appId}/public/data/conversations/{conversationId}/messages/{messageId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+    
+    // ===== AYARLAR =====
+    match /artifacts/{appId}/public/data/settings/{settingId} {
+      // global ve price_list herkese açık okuma
+      allow read: if isAuthenticated() && settingId in ['global', 'price_list', 'iyzico'];
+      // admin ayarları sadece admin okuyabilir (artık client'tan okunmayacak ama yedek)
+      allow read: if isAdmin();
+      // Yazma sadece admin
+      allow write: if isAdmin();
+    }
+    
+    // ===== ÖDEMELER =====
+    match /artifacts/{appId}/public/data/payments/{paymentId} {
+      // Kullanıcılar ödeme kaydı oluşturabilir
+      allow create: if isAuthenticated();
+      // Okuma ve yönetim sadece admin
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ===== ABONELİK LOGLARI (GELİR/GİDER) =====
+    match /artifacts/{appId}/public/data/subscription_logs/{logId} {
+      // Admin tam yetki
+      allow read, write: if isAdmin();
+      // Authenticated kullanıcılar log oluşturabilir (süre uzatma vb.)
+      allow create: if isAuthenticated();
+    }
+
+    // ===== DİĞER TÜM KOLEKSİYONLAR =====
+    // Varsayılan olarak erişim kapalı
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
