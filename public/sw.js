@@ -1,14 +1,20 @@
-const CACHE_NAME = 'balkan-iptv-v4';
+const CACHE_NAME = 'balkan-iptv-v5';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
   '/icons/icon-192.png',
-  '/icons/icon-512.png'
+  '/icons/icon-512.png',
+  '/icons/icon-72.png',
+  '/icons/icon-96.png',
+  '/icons/icon-128.png',
+  '/icons/icon-144.png',
+  '/icons/icon-152.png',
+  '/icons/icon-384.png'
 ];
 
 // CDN kaynakları - cache-first stratejisi
-const CDN_CACHE_NAME = 'balkan-iptv-cdn-v1';
+const CDN_CACHE_NAME = 'balkan-iptv-cdn-v2';
 const CDN_PATTERNS = [
   'cdn.tailwindcss.com',
   'cdn.jsdelivr.net',
@@ -46,7 +52,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch - Network first, cache fallback stratejisi
+// Fetch - Akıllı cache stratejisi
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -109,4 +115,66 @@ self.addEventListener('fetch', (event) => {
         });
       })
   );
+});
+
+// =========================================
+// PUSH NOTIFICATION HANDLER
+// =========================================
+self.addEventListener('push', (event) => {
+  let data = { title: 'Balkan IPTV', body: 'Yeni bir bildiriminiz var.' };
+  
+  try {
+    if (event.data) {
+      data = event.data.json();
+    }
+  } catch (e) {
+    if (event.data) {
+      data.body = event.data.text();
+    }
+  }
+
+  const options = {
+    body: data.body || 'Yeni bir bildiriminiz var.',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-72.png',
+    vibrate: [100, 50, 100],
+    tag: data.tag || 'general',
+    renotify: true,
+    data: {
+      url: data.url || '/',
+      dateOfArrival: Date.now()
+    },
+    actions: data.actions || []
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Balkan IPTV', options)
+  );
+});
+
+// Bildirime tıklandığında
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  
+  const urlToOpen = event.notification.data?.url || '/';
+  
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // Zaten açık sekme varsa odaklan
+      for (const client of windowClients) {
+        if (client.url.includes('balkantvpanel') && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Yoksa yeni sekme aç
+      return clients.openWindow(urlToOpen);
+    })
+  );
+});
+
+// Arka plan senkronizasyonu (gelecekte offline talep desteği için)
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'sync-requests') {
+    console.log('[SW] Arka plan senkronizasyonu tetiklendi');
+  }
 });

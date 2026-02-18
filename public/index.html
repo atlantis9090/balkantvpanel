@@ -20,6 +20,12 @@
     <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
     <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
     <link rel="dns-prefetch" href="https://us-central1-balkantvpanel.cloudfunctions.net">
+    <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>tailwind.config = { darkMode: 'class' }</script>
@@ -195,9 +201,124 @@
             0%, 100% { filter: drop-shadow(0 0 0px rgba(249, 115, 22, 0)); }
             50% { filter: drop-shadow(0 0 12px rgba(249, 115, 22, 0.35)); }
         }
+        /* Skeleton Loading */
+        @keyframes shimmer {
+            0% { background-position: -468px 0; }
+            100% { background-position: 468px 0; }
+        }
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 936px 100%;
+            animation: shimmer 1.5s ease-in-out infinite;
+            border-radius: 8px;
+        }
+        .skeleton-text {
+            height: 14px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+        }
+        .skeleton-title {
+            height: 20px;
+            width: 60%;
+            margin-bottom: 12px;
+            border-radius: 4px;
+        }
+        .skeleton-card {
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 8px;
+        }
+        html.dark .skeleton {
+            background: linear-gradient(90deg, #1a1a2e 25%, #16213e 50%, #1a1a2e 75%);
+            background-size: 936px 100%;
+            animation: shimmer 1.5s ease-in-out infinite;
+        }
+        /* Offline Banner */
+        .offline-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 9999;
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            color: white;
+            text-align: center;
+            padding: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            transform: translateY(-100%);
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .offline-banner.visible {
+            transform: translateY(0);
+        }
+        /* Dark Mode Geçiş Animasyonu */
+        html.dark-transition,
+        html.dark-transition *,
+        html.dark-transition *::before,
+        html.dark-transition *::after {
+            transition: background-color 0.4s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease !important;
+        }
+        /* Geri Sayım Widget */
+        .countdown-widget {
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            border-radius: 16px;
+            padding: 20px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        .countdown-widget::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            pointer-events: none;
+        }
+        .countdown-widget.expiring-soon {
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+            animation: countdownPulse 2s ease-in-out infinite;
+        }
+        .countdown-widget.expired {
+            background: linear-gradient(135deg, #6b7280 0%, #374151 100%);
+        }
+        @keyframes countdownPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+            50% { box-shadow: 0 0 0 12px rgba(220, 38, 38, 0); }
+        }
+        .countdown-number {
+            font-size: 2rem;
+            font-weight: 800;
+            line-height: 1;
+        }
+        .countdown-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            opacity: 0.85;
+            letter-spacing: 0.5px;
+        }
+        /* Bildirim toast animasyonu */
+        @keyframes notificationSlideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .realtime-notification {
+            animation: notificationSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center py-10 px-4">
+    <!-- Offline Banner -->
+    <div id="offlineBanner" class="offline-banner">
+        ⚠️ İnternet bağlantınız yok — Çevrimdışı moddasınız
+    </div>
+    
+    <!-- Gerçek Zamanlı Bildirim Container -->
+    <div id="realtimeNotifications" class="fixed top-16 right-4 z-[9997] space-y-2 max-w-sm"></div>
+
     <!-- Dark Mode Toggle -->
     <button id="darkModeToggle" class="dark-toggle fixed top-4 right-4 z-[9998] bg-gray-800 hover:bg-gray-700 text-yellow-400 rounded-full p-3 shadow-xl border-2 border-yellow-400/30 hover:border-yellow-400/60" title="Tema Değiştir">
         <svg id="darkModeIcon" class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
@@ -208,7 +329,7 @@
     <div id="pwaInstallBanner" class="hidden fixed bottom-0 left-0 right-0 z-[9999] p-4 bg-gradient-to-r from-orange-500 to-orange-600 shadow-2xl safe-bottom" style="animation: slideUp 0.4s ease-out;">
         <div class="max-w-lg mx-auto flex items-center justify-between gap-3">
             <div class="flex items-center gap-3">
-                <img src="/icons/icon-72.png" alt="" class="w-10 h-10 rounded-xl shadow">
+                <img src="/icons/icon-72.png" alt="" class="w-10 h-10 rounded-xl shadow" loading="lazy" width="40" height="40">
                 <div class="text-white">
                     <p class="font-bold text-sm">Balkan IPTV</p>
                     <p class="text-xs text-orange-100">Ana ekrana ekle, uygulama gibi kullan!</p>
@@ -239,6 +360,7 @@
                      alt="Balkan Premium TV" 
                      class="h-20 sm:h-24 w-auto object-contain transition-all duration-500 group-hover:scale-110 group-hover:drop-shadow-lg" 
                      style="animation: logoFadeIn 1s ease-out, logoPulse 3s ease-in-out 1s infinite;"
+                     loading="lazy" decoding="async" fetchpriority="high"
                      onerror="this.style.display='none'">
             </a>
         </div>
@@ -405,6 +527,40 @@
             
             <!-- 1. HESAP BİLGİLERİM GÖRÜNÜMÜ -->
             <div id="userInfoView" class="user-panel-view"> 
+                <!-- Hesap Süresi Geri Sayım Widget -->
+                <div id="countdownWidget" class="countdown-widget mt-4 mb-4 hidden">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm opacity-90 font-medium">⏳ Üyelik Bitiş Süreniz</p>
+                            <p id="countdownDate" class="text-xs opacity-75 mt-1"></p>
+                        </div>
+                        <div id="countdownTimer" class="flex gap-3 text-center">
+                            <div><span id="cdDays" class="countdown-number">--</span><p class="countdown-label">Gün</p></div>
+                            <div><span id="cdHours" class="countdown-number">--</span><p class="countdown-label">Saat</p></div>
+                            <div><span id="cdMins" class="countdown-number">--</span><p class="countdown-label">Dk</p></div>
+                            <div><span id="cdSecs" class="countdown-number">--</span><p class="countdown-label">Sn</p></div>
+                        </div>
+                    </div>
+                    <div id="countdownProgress" class="mt-3 h-2 bg-white/20 rounded-full overflow-hidden">
+                        <div id="countdownBar" class="h-full bg-white/60 rounded-full transition-all duration-1000" style="width: 100%"></div>
+                    </div>
+                    <p id="countdownMessage" class="text-xs opacity-80 mt-2 text-center"></p>
+                </div>
+
+                <!-- Skeleton Loading -->
+                <div id="userDataSkeleton" class="mt-8 p-4 sm:p-6 border border-gray-200 rounded-xl bg-white shadow-lg hidden">
+                    <div class="skeleton skeleton-title"></div>
+                    <div class="space-y-2">
+                        <div class="skeleton skeleton-card" style="height: 52px;"></div>
+                        <div class="skeleton skeleton-card" style="height: 52px;"></div>
+                        <div class="skeleton skeleton-card" style="height: 52px;"></div>
+                        <div class="skeleton skeleton-card" style="height: 52px;"></div>
+                        <div class="skeleton skeleton-card" style="height: 52px;"></div>
+                        <div class="skeleton skeleton-card" style="height: 52px;"></div>
+                        <div class="skeleton skeleton-card" style="height: 52px;"></div>
+                    </div>
+                </div>
+
                 <div id="resultContainer" class="mt-8 p-4 sm:p-6 border border-green-200 rounded-xl bg-green-50 shadow-lg">
                     <h2 class="text-xl sm:text-2xl font-bold text-green-700 border-b-2 border-green-300 pb-3 mb-4 flex items-center">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
@@ -937,6 +1093,14 @@
                                 <span class="w-1/6 text-right">İşlemler</span>
                             </div>
                             <div id="userListContent">
+                                <!-- Admin Skeleton Loading -->
+                                <div id="adminListSkeleton" class="hidden space-y-2 p-2">
+                                    <div class="skeleton skeleton-card" style="height: 56px;"></div>
+                                    <div class="skeleton skeleton-card" style="height: 56px;"></div>
+                                    <div class="skeleton skeleton-card" style="height: 56px;"></div>
+                                    <div class="skeleton skeleton-card" style="height: 56px;"></div>
+                                    <div class="skeleton skeleton-card" style="height: 56px;"></div>
+                                </div>
                                 <p class="text-center p-4 text-gray-500" id="listStatus">Listeyi görüntülemek için Yenile'ye tıklayın.</p>
                             </div>
                         </div>
@@ -2065,6 +2229,12 @@
             // Listener'ları temizle
             if (unsubscribeMessages) { unsubscribeMessages(); unsubscribeMessages = null; }
             if (unsubscribeConversations) { unsubscribeConversations(); unsubscribeConversations = null; }
+            stopRealtimeListeners();
+            
+            // Geri sayımı durdur
+            if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+            const countdownWidget = document.getElementById('countdownWidget');
+            if (countdownWidget) countdownWidget.classList.add('hidden');
             
             // Session temizle
             sessionStorage.removeItem('iptvSession');
@@ -2775,6 +2945,8 @@
                     adminView.style.display = 'block';
                     fetchAllUsers(true);
                     showAdminView('dashboard');
+                    startRealtimeListeners();
+                    requestNotificationPermission();
                     console.log('Admin oturumu geri yüklendi.');
                     return;
                 }
@@ -2800,7 +2972,14 @@
                         }
                         currentLoggedInUser = data;
                         userWelcomeHeader.textContent = `Hoş Geldiniz, ${data.iptvUsername}!`;
+                        showUserSkeleton();
                         displayUserData(data);
+                        hideUserSkeleton();
+                        
+                        // Geri sayım ve gerçek zamanlı bildirimler
+                        if (data.expirationDate) startCountdown(data.expirationDate);
+                        startUserRealtimeListener(data.iptvUsername);
+                        requestNotificationPermission();
                         
                         // Güvenlik: Şifreyi bellekten temizle (displayUserData zaten kullandı)
                         delete currentLoggedInUser.iptvPassword;
@@ -2879,7 +3058,14 @@
                     
                     // Kullanıcı arayüzünü güncelle
                     userWelcomeHeader.textContent = `Hoş Geldiniz, ${data.iptvUsername}!`;
+                    showUserSkeleton();
                     displayUserData(data);
+                    hideUserSkeleton();
+                    
+                    // Geri sayım ve gerçek zamanlı bildirimler
+                    if (data.expirationDate) startCountdown(data.expirationDate);
+                    startUserRealtimeListener(data.iptvUsername);
+                    requestNotificationPermission();
                     
                     // Güvenlik: Şifreyi bellekten temizle (displayUserData zaten kullandı)
                     delete currentLoggedInUser.iptvPassword;
@@ -2920,6 +3106,8 @@
                         adminView.style.display = 'block';
                         fetchAllUsers(true); 
                         showAdminView('dashboard');
+                        startRealtimeListeners();
+                        requestNotificationPermission();
                         return;
                     }
                 } catch (adminError) {
@@ -4171,6 +4359,7 @@ Keyifli seyirler! 📺`;
         async function fetchAllUsers(updateMetrics = false) {
              if (!isAdminUser && !updateMetrics) return;
 
+            showAdminListSkeleton();
             listStatusEl.textContent = "Kullanıcılar yükleniyor...";
             userListContent.innerHTML = '';
             userCountEl.textContent = '0';
@@ -4217,6 +4406,7 @@ Keyifli seyirler! 📺`;
                 listStatusEl.classList.remove('hidden');
                 userListContent.appendChild(listStatusEl);
             } finally {
+                hideAdminListSkeleton();
                 refreshUserListButton.disabled = false;
             }
         }
@@ -6105,6 +6295,9 @@ Keyifli seyirler! 📺`;
         const darkIcon = document.getElementById('darkModeIcon');
         const lightIcon = document.getElementById('lightModeIcon');
         function applyDarkMode(isDark) {
+            // Geçiş animasyonu ekle
+            document.documentElement.classList.add('dark-transition');
+            
             if (isDark) {
                 document.documentElement.classList.add('dark');
                 if (darkIcon) darkIcon.classList.add('hidden');
@@ -6114,6 +6307,17 @@ Keyifli seyirler! 📺`;
                 if (darkIcon) darkIcon.classList.remove('hidden');
                 if (lightIcon) lightIcon.classList.add('hidden');
             }
+            
+            // Dark mode meta theme-color güncelle
+            const themeMetaTag = document.querySelector('meta[name="theme-color"]');
+            if (themeMetaTag) {
+                themeMetaTag.content = isDark ? '#1a1a2e' : '#f97316';
+            }
+            
+            // Animasyonu temizle (performans için)
+            setTimeout(() => {
+                document.documentElement.classList.remove('dark-transition');
+            }, 500);
         }
         // Sayfa açılınca localStorage'den oku
         applyDarkMode(localStorage.getItem('darkMode') === 'true');
@@ -6615,8 +6819,331 @@ Keyifli seyirler! 📺`;
             if (mini) mini.classList.add('hidden');
         }
 
+        // ===============================================
+        // HESAP SÜRESİ GERİ SAYIM SİSTEMİ
+        // ===============================================
+        let countdownInterval = null;
+        
+        function startCountdown(expirationDate) {
+            const widget = document.getElementById('countdownWidget');
+            if (!widget || !expirationDate) return;
+            
+            widget.classList.remove('hidden');
+            
+            // Geri sayım interval'i temizle
+            if (countdownInterval) clearInterval(countdownInterval);
+            
+            const expiryDate = expirationDate?.toDate ? expirationDate.toDate() : new Date(expirationDate);
+            const cdDays = document.getElementById('cdDays');
+            const cdHours = document.getElementById('cdHours');
+            const cdMins = document.getElementById('cdMins');
+            const cdSecs = document.getElementById('cdSecs');
+            const cdMsg = document.getElementById('countdownMessage');
+            const cdDate = document.getElementById('countdownDate');
+            const cdBar = document.getElementById('countdownBar');
+            
+            if (cdDate) {
+                cdDate.textContent = `Bitiş: ${expiryDate.toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}`;
+            }
+            
+            // Toplam süre (1 yıl max) — ilerleme çubuğu için
+            const totalDuration = 365 * 24 * 60 * 60 * 1000;
+            
+            function updateCountdown() {
+                const now = new Date();
+                const diff = expiryDate - now;
+                
+                if (diff <= 0) {
+                    // Süre dolmuş
+                    widget.className = 'countdown-widget mt-4 mb-4 expired';
+                    if (cdDays) cdDays.textContent = '0';
+                    if (cdHours) cdHours.textContent = '0';
+                    if (cdMins) cdMins.textContent = '0';
+                    if (cdSecs) cdSecs.textContent = '0';
+                    if (cdMsg) cdMsg.textContent = '❌ Üyelik süreniz dolmuştur. Lütfen yenileme talebi gönderin.';
+                    if (cdBar) cdBar.style.width = '0%';
+                    clearInterval(countdownInterval);
+                    return;
+                }
+                
+                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+                
+                if (cdDays) cdDays.textContent = days;
+                if (cdHours) cdHours.textContent = hours.toString().padStart(2, '0');
+                if (cdMins) cdMins.textContent = minutes.toString().padStart(2, '0');
+                if (cdSecs) cdSecs.textContent = seconds.toString().padStart(2, '0');
+                
+                // İlerleme çubuğu
+                const progressPercent = Math.min(100, Math.max(0, (diff / totalDuration) * 100));
+                if (cdBar) cdBar.style.width = `${progressPercent}%`;
+                
+                // Son 7 gün kala uyarı
+                if (days <= 7) {
+                    widget.className = 'countdown-widget mt-4 mb-4 expiring-soon';
+                    if (cdMsg) cdMsg.textContent = `⚠️ Son ${days} gün! Kesinti yaşamamak için şimdi uzatma talebi gönderin.`;
+                } else if (days <= 30) {
+                    widget.className = 'countdown-widget mt-4 mb-4';
+                    if (cdMsg) cdMsg.textContent = `📅 ${days} gün kaldı. Zamanında uzatma yapmanızı öneririz.`;
+                } else {
+                    widget.className = 'countdown-widget mt-4 mb-4';
+                    if (cdMsg) cdMsg.textContent = `✅ Aktif aboneliğiniz sorunsuz devam ediyor.`;
+                }
+            }
+            
+            updateCountdown();
+            countdownInterval = setInterval(updateCountdown, 1000);
+        }
+
+        // ===============================================
+        // SKELETON LOADING HELPERS
+        // ===============================================
+        function showUserSkeleton() {
+            const skeleton = document.getElementById('userDataSkeleton');
+            const container = document.getElementById('resultContainer');
+            if (skeleton) skeleton.classList.remove('hidden');
+            if (container) container.classList.add('hidden');
+        }
+        
+        function hideUserSkeleton() {
+            const skeleton = document.getElementById('userDataSkeleton');
+            const container = document.getElementById('resultContainer');
+            if (skeleton) skeleton.classList.add('hidden');
+            if (container) container.classList.remove('hidden');
+        }
+        
+        function showAdminListSkeleton() {
+            const skeleton = document.getElementById('adminListSkeleton');
+            const status = document.getElementById('listStatus');
+            if (skeleton) skeleton.classList.remove('hidden');
+            if (status) status.classList.add('hidden');
+        }
+        
+        function hideAdminListSkeleton() {
+            const skeleton = document.getElementById('adminListSkeleton');
+            if (skeleton) skeleton.classList.add('hidden');
+        }
+
+        // ===============================================
+        // ONLINE/OFFLINE ALGILAMA
+        // ===============================================
+        function updateOnlineStatus() {
+            const banner = document.getElementById('offlineBanner');
+            if (!banner) return;
+            
+            if (!navigator.onLine) {
+                banner.classList.add('visible');
+            } else {
+                banner.classList.remove('visible');
+            }
+        }
+        
+        window.addEventListener('online', () => {
+            updateOnlineStatus();
+            showRealtimeToast('🌐 İnternet bağlantısı kuruldu', 'success');
+        });
+        
+        window.addEventListener('offline', () => {
+            updateOnlineStatus();
+        });
+
+        // ===============================================
+        // GERÇEK ZAMANLI BİLDİRİM TOAST
+        // ===============================================
+        function showRealtimeToast(message, type = 'info', duration = 4000) {
+            const container = document.getElementById('realtimeNotifications');
+            if (!container) return;
+            
+            const colors = {
+                info: 'bg-blue-600',
+                success: 'bg-green-600',
+                warning: 'bg-yellow-500',
+                error: 'bg-red-600'
+            };
+            
+            const toast = document.createElement('div');
+            toast.className = `realtime-notification ${colors[type] || colors.info} text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-medium flex items-center gap-2 max-w-sm`;
+            toast.innerHTML = `
+                <span class="flex-grow">${message}</span>
+                <button class="opacity-70 hover:opacity-100 text-lg leading-none" onclick="this.parentElement.remove()">✕</button>
+            `;
+            
+            container.appendChild(toast);
+            
+            // Otomatik kaldır
+            setTimeout(() => {
+                toast.style.transition = 'opacity 0.3s, transform 0.3s';
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+
+        // ===============================================
+        // GERÇEK ZAMANLI FIRESTORE DİNLEME (onSnapshot)
+        // ===============================================
+        let userSnapshotUnsubscribe = null;
+        let requestsSnapshotUnsubscribe = null;
+        let messagesSnapshotUnsubscribe = null;
+        
+        function startRealtimeListeners() {
+            // Admin: Yeni talep dinleme
+            if (isAdminUser) {
+                startAdminRealtimeListeners();
+            }
+        }
+        
+        function startAdminRealtimeListeners() {
+            // Yenileme talepleri dinle
+            try {
+                const renewalRef = collection(db, `artifacts/${appId}/public/data/renewal_requests`);
+                const renewalQuery = query(renewalRef, where('status', '==', 'Beklemede'));
+                
+                if (requestsSnapshotUnsubscribe) requestsSnapshotUnsubscribe();
+                
+                let isFirstSnapshot = true;
+                requestsSnapshotUnsubscribe = onSnapshot(renewalQuery, (snapshot) => {
+                    if (isFirstSnapshot) {
+                        isFirstSnapshot = false;
+                        return; // İlk yükleme - bildirim gösterme
+                    }
+                    
+                    snapshot.docChanges().forEach(change => {
+                        if (change.type === 'added') {
+                            const data = change.doc.data();
+                            showRealtimeToast(`📢 Yeni uzatma talebi: ${data.username || 'Bilinmeyen'}`, 'warning', 6000);
+                            
+                            // Push notification da gönder (varsa)
+                            if (Notification.permission === 'granted') {
+                                new Notification('Yeni Uzatma Talebi', {
+                                    body: `${data.username} - ${data.requestDuration}`,
+                                    icon: '/icons/icon-192.png',
+                                    tag: 'renewal-' + change.doc.id
+                                });
+                            }
+                        }
+                    });
+                }, (error) => {
+                    console.warn('Talep dinleme hatası:', error);
+                });
+                
+                // Yeni hesap talepleri dinle
+                const newAccountRef = collection(db, `artifacts/${appId}/public/data/new_account_requests`);
+                const newAccountQuery = query(newAccountRef, where('status', '==', 'Beklemede'));
+                
+                let isFirstAccountSnapshot = true;
+                const unsubNewAccount = onSnapshot(newAccountQuery, (snapshot) => {
+                    if (isFirstAccountSnapshot) {
+                        isFirstAccountSnapshot = false;
+                        return;
+                    }
+                    
+                    snapshot.docChanges().forEach(change => {
+                        if (change.type === 'added') {
+                            const data = change.doc.data();
+                            showRealtimeToast(`🆕 Yeni hesap talebi: ${data.fullName || 'Bilinmeyen'}`, 'info', 6000);
+                            
+                            if (Notification.permission === 'granted') {
+                                new Notification('Yeni Hesap Talebi', {
+                                    body: `${data.fullName} - ${data.requestDuration}`,
+                                    icon: '/icons/icon-192.png',
+                                    tag: 'new-account-' + change.doc.id
+                                });
+                            }
+                        }
+                    });
+                }, (error) => {
+                    console.warn('Yeni hesap dinleme hatası:', error);
+                });
+                
+                // Eski unsubscribe'ı güncelle
+                const oldUnsub = requestsSnapshotUnsubscribe;
+                requestsSnapshotUnsubscribe = () => {
+                    oldUnsub();
+                    unsubNewAccount();
+                };
+                
+            } catch (err) {
+                console.warn('Realtime listener başlatma hatası:', err);
+            }
+        }
+        
+        function startUserRealtimeListener(username) {
+            // Kullanıcı: Kendi mesajlarını dinle
+            try {
+                const messagesRef = collection(db, `artifacts/${appId}/public/data/messages`);
+                
+                if (messagesSnapshotUnsubscribe) messagesSnapshotUnsubscribe();
+                
+                let isFirstMsgSnapshot = true;
+                messagesSnapshotUnsubscribe = onSnapshot(messagesRef, (snapshot) => {
+                    if (isFirstMsgSnapshot) {
+                        isFirstMsgSnapshot = false;
+                        return;
+                    }
+                    
+                    snapshot.docChanges().forEach(change => {
+                        if (change.type === 'added') {
+                            const data = change.doc.data();
+                            showRealtimeToast(`💬 Yeni mesaj: ${data.title || 'Yöneticiden mesaj'}`, 'info', 5000);
+                            
+                            if (Notification.permission === 'granted') {
+                                new Notification('Yeni Mesaj', {
+                                    body: data.title || 'Yöneticiden yeni bir mesaj aldınız.',
+                                    icon: '/icons/icon-192.png',
+                                    tag: 'message-' + change.doc.id
+                                });
+                            }
+                        }
+                    });
+                }, (error) => {
+                    console.warn('Mesaj dinleme hatası:', error);
+                });
+            } catch (err) {
+                console.warn('User realtime listener hatası:', err);
+            }
+        }
+        
+        function stopRealtimeListeners() {
+            if (requestsSnapshotUnsubscribe) { requestsSnapshotUnsubscribe(); requestsSnapshotUnsubscribe = null; }
+            if (messagesSnapshotUnsubscribe) { messagesSnapshotUnsubscribe(); messagesSnapshotUnsubscribe = null; }
+            if (userSnapshotUnsubscribe) { userSnapshotUnsubscribe(); userSnapshotUnsubscribe = null; }
+        }
+
+        // ===============================================
+        // PUSH NOTIFICATION İZİN İSTEME
+        // ===============================================
+        async function requestNotificationPermission() {
+            if (!('Notification' in window)) {
+                console.log('Bu tarayıcı bildirimleri desteklemiyor.');
+                return false;
+            }
+            
+            if (Notification.permission === 'granted') {
+                return true;
+            }
+            
+            if (Notification.permission !== 'denied') {
+                const permission = await Notification.requestPermission();
+                return permission === 'granted';
+            }
+            
+            return false;
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             initializeFirebase();
+            
+            // Online/Offline algılama
+            updateOnlineStatus();
+            
+            // Bildirim izni iste (kullanıcı etkileşimi sonrası)
+            document.addEventListener('click', function requestNotifOnce() {
+                requestNotificationPermission();
+                document.removeEventListener('click', requestNotifOnce);
+            }, { once: true });
 
             // Eski 24 saat cooldown'ı temizle
             localStorage.removeItem('pwaInstallDismissed');
