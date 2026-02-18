@@ -2773,7 +2773,6 @@
                     loginForm.style.display = 'none';
                     adminView.style.display = 'block';
                     fetchAllUsers(true);
-                    migrateFebruaryLogs();
                     showAdminView('dashboard');
                     console.log('Admin oturumu geri yüklendi.');
                     return;
@@ -2903,8 +2902,6 @@
                         loginForm.style.display = 'none';
                         adminView.style.display = 'block';
                         fetchAllUsers(true); 
-                        // Şubat 2026 geçmiş log migrasyonu (tek sefer çalışır)
-                        migrateFebruaryLogs();
                         showAdminView('dashboard');
                         return;
                     }
@@ -2988,34 +2985,45 @@
             submitNewAccountRequestButton.textContent = "Kontrol ediliyor...";
             
             try {
-                // Telefon numarası benzersizlik kontrolü - mevcut taleplerde ara
-                const requestsRef = collection(db, `artifacts/${appId}/public/data/new_account_requests`);
-                const phoneQuery = query(requestsRef, where('phoneNumber', '==', cleanPhone));
-                const existingRequests = await getDocs(phoneQuery);
-                
-                if (!existingRequests.empty) {
-                    phoneError.textContent = '⚠️ Bu telefon numarası ile daha önce hesap talebi oluşturulmuş. Her numara ile yalnızca 1 kez talep gönderilebilir.';
-                    phoneError.classList.remove('hidden');
-                    showMessage("Bu telefon numarası ile zaten bir talep mevcut.", 'error');
-                    return;
+                // Telefon numarası benzersizlik kontrolü
+                // Not: Normal kullanıcılar koleksiyon listeleyemez, kontrol başarısız olursa talep yine gönderilir
+                let phoneCheckPassed = true;
+                try {
+                    const requestsRef = collection(db, `artifacts/${appId}/public/data/new_account_requests`);
+                    const phoneQuery = query(requestsRef, where('phoneNumber', '==', cleanPhone));
+                    const existingRequests = await getDocs(phoneQuery);
+                    
+                    if (!existingRequests.empty) {
+                        phoneError.textContent = '⚠️ Bu telefon numarası ile daha önce hesap talebi oluşturulmuş. Her numara ile yalnızca 1 kez talep gönderilebilir.';
+                        phoneError.classList.remove('hidden');
+                        showMessage("Bu telefon numarası ile zaten bir talep mevcut.", 'error');
+                        phoneCheckPassed = false;
+                    }
+                } catch (phoneCheckErr) {
+                    console.log('Telefon kontrol sorgusu atlandı (yetki kısıtlı):', phoneCheckErr.code);
                 }
 
-                // Mevcut kullanıcılarda da kontrol et
-                const usersRef = collection(db, `artifacts/${appId}/public/data/iptv_users`);
-                const usersSnapshot = await getDocs(usersRef);
-                let phoneExists = false;
-                usersSnapshot.forEach(doc => {
-                    const userData = doc.data();
-                    if (userData.phoneNumber === cleanPhone) {
-                        phoneExists = true;
-                    }
-                });
+                if (!phoneCheckPassed) return;
 
-                if (phoneExists) {
-                    phoneError.textContent = '⚠️ Bu telefon numarası ile kayıtlı bir hesap zaten mevcut. Lütfen giriş yapınız.';
-                    phoneError.classList.remove('hidden');
-                    showMessage("Bu telefon numarası ile kayıtlı bir hesap zaten var.", 'error');
-                    return;
+                try {
+                    const usersRef = collection(db, `artifacts/${appId}/public/data/iptv_users`);
+                    const usersSnapshot = await getDocs(usersRef);
+                    let phoneExists = false;
+                    usersSnapshot.forEach(doc => {
+                        const userData = doc.data();
+                        if (userData.phoneNumber === cleanPhone) {
+                            phoneExists = true;
+                        }
+                    });
+
+                    if (phoneExists) {
+                        phoneError.textContent = '⚠️ Bu telefon numarası ile kayıtlı bir hesap zaten mevcut. Lütfen giriş yapınız.';
+                        phoneError.classList.remove('hidden');
+                        showMessage("Bu telefon numarası ile kayıtlı bir hesap zaten var.", 'error');
+                        return;
+                    }
+                } catch (userCheckErr) {
+                    console.log('Kullanıcı telefon kontrol sorgusu atlandı (yetki kısıtlı):', userCheckErr.code);
                 }
 
                 submitNewAccountRequestButton.textContent = "Talep Gönderiliyor...";
@@ -4240,11 +4248,11 @@ Keyifli seyirler! 📺`;
                         cardDiv.className = 'p-3 border rounded-lg bg-blue-50 flex justify-between items-center';
                         cardDiv.innerHTML = `
                             <div class="flex-grow">
-                                <p class="font-bold text-sm text-gray-700">👤 ${user.iptvUsername}</p>
+                                <p class="font-bold text-sm text-gray-700">👤 ${escapeHtml(user.iptvUsername)}</p>
                                 <p class="text-xs text-gray-600">Tip: ${user.userType === 'YURTDISI' ? 'Yurtdışı' : 'Yurtiçi'}</p>
                                 <p class="text-xs text-red-600 font-semibold">⏰ ${timeText} kaldı</p>
                             </div>
-                            <button class="convert-test-btn py-1 px-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs transition-colors" data-username="${user.iptvUsername}">
+                            <button class="convert-test-btn py-1 px-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs transition-colors" data-username="${escapeHtml(user.iptvUsername)}">
                                 Normal'e Çevir
                             </button>
                         `;
@@ -4478,31 +4486,31 @@ Keyifli seyirler! 📺`;
                         <div class="sm:hidden space-y-2">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <p class="font-bold text-gray-800 text-base">${user.iptvUsername} ${testAccountBadge}</p>
-                                    <p class="text-xs text-gray-500">Şifre: ${user.iptvPassword}</p>
+                                    <p class="font-bold text-gray-800 text-base">${escapeHtml(user.iptvUsername)} ${testAccountBadge}</p>
+                                    <p class="text-xs text-gray-500">Şifre: ${escapeHtml(user.iptvPassword)}</p>
                                 </div>
                                 <span class="text-xs font-bold ${statusClass} text-white px-2.5 py-1 rounded-full">${statusText}</span>
                             </div>
                             <div class="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
                                 <div class="flex items-center gap-2">
-                                    <span class="${typeClass} font-medium text-xs px-2 py-0.5 rounded">${user.userType || 'BİLİNMİYOR'}</span>
+                                    <span class="${typeClass} font-medium text-xs px-2 py-0.5 rounded">${escapeHtml(user.userType || 'BİLİNMİYOR')}</span>
                                 </div>
                                 <div class="text-right">
-                                    <span class="text-gray-700 font-medium text-xs">${user.expirationDate}</span>
+                                    <span class="text-gray-700 font-medium text-xs">${escapeHtml(user.expirationDate)}</span>
                                     <span class="block text-xs ${remainingDaysInfo.class}">${remainingDaysInfo.text}</span>
                                 </div>
                             </div>
                             <div class="flex justify-end items-center gap-2 pt-1 border-t border-gray-100">
-                                <button title="Kopyala" data-username="${user.iptvUsername}" data-password="${user.iptvPassword}" data-expiry="${user.expirationDate}" data-usertype="${user.userType}" class="list-copy-button p-1.5 text-green-600 hover:bg-green-100 rounded-lg transition-colors">
+                                <button title="Kopyala" data-username="${escapeHtml(user.iptvUsername)}" data-password="${escapeHtml(user.iptvPassword)}" data-expiry="${escapeHtml(user.expirationDate)}" data-usertype="${escapeHtml(user.userType)}" class="list-copy-button p-1.5 text-green-600 hover:bg-green-100 rounded-lg transition-colors">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>
                                 </button>
-                                <button title="Düzenle" data-username="${user.iptvUsername}" class="list-edit-button p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors">
+                                <button title="Düzenle" data-username="${escapeHtml(user.iptvUsername)}" class="list-edit-button p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                                 </button>
-                                <button title="Süre Uzat" data-username="${user.iptvUsername}" class="list-extend-button p-1.5 text-green-600 hover:bg-green-100 rounded-lg transition-colors">
+                                <button title="Süre Uzat" data-username="${escapeHtml(user.iptvUsername)}" class="list-extend-button p-1.5 text-green-600 hover:bg-green-100 rounded-lg transition-colors">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                                 </button>
-                                <button title="Sil" data-username="${user.iptvUsername}" class="list-delete-button p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors">
+                                <button title="Sil" data-username="${escapeHtml(user.iptvUsername)}" class="list-delete-button p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                                 </button>
                             </div>
@@ -4510,25 +4518,25 @@ Keyifli seyirler! 📺`;
                         <!-- Masaüstü Satır Görünümü -->
                         <div class="hidden sm:flex items-center justify-between">
                             <div class="w-1/4 truncate">
-                                <p class="font-semibold">${user.iptvUsername} ${testAccountBadge}</p>
-                                <p class="text-xs text-gray-500">Şifre: ${user.iptvPassword}</p>
+                                <p class="font-semibold">${escapeHtml(user.iptvUsername)} ${testAccountBadge}</p>
+                                <p class="text-xs text-gray-500">Şifre: ${escapeHtml(user.iptvPassword)}</p>
                             </div>
-                            <span class="w-1/5 text-center"><span class="${typeClass} font-medium px-2 py-0.5 rounded">${user.userType || 'BİLİNMİYOR'}</span></span>
-                            <span class="w-1/4 text-center text-gray-600">${user.expirationDate} <span class="text-xs ${remainingDaysInfo.class}">(${remainingDaysInfo.text})</span></span>
+                            <span class="w-1/5 text-center"><span class="${typeClass} font-medium px-2 py-0.5 rounded">${escapeHtml(user.userType || 'BİLİNMİYOR')}</span></span>
+                            <span class="w-1/4 text-center text-gray-600">${escapeHtml(user.expirationDate)} <span class="text-xs ${remainingDaysInfo.class}">(${remainingDaysInfo.text})</span></span>
                             <div class="w-1/6 text-center">
                                 <span class="text-xs font-bold ${statusClass} text-white px-2 py-0.5 rounded">${statusText}</span>
                             </div>
                             <div class="w-1/6 text-right flex justify-end items-center space-x-2">
-                                <button title="Kopyala" data-username="${user.iptvUsername}" data-password="${user.iptvPassword}" data-expiry="${user.expirationDate}" data-usertype="${user.userType}" class="list-copy-button p-1 text-green-600 hover:bg-green-100 rounded-full transition-colors">
+                                <button title="Kopyala" data-username="${escapeHtml(user.iptvUsername)}" data-password="${escapeHtml(user.iptvPassword)}" data-expiry="${escapeHtml(user.expirationDate)}" data-usertype="${escapeHtml(user.userType)}" class="list-copy-button p-1 text-green-600 hover:bg-green-100 rounded-full transition-colors">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>
                                 </button>
-                                <button title="Düzenle" data-username="${user.iptvUsername}" class="list-edit-button p-1 text-blue-600 hover:bg-blue-100 rounded-full transition-colors">
+                                <button title="Düzenle" data-username="${escapeHtml(user.iptvUsername)}" class="list-edit-button p-1 text-blue-600 hover:bg-blue-100 rounded-full transition-colors">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                                 </button>
-                                <button title="Süre Uzat" data-username="${user.iptvUsername}" class="list-extend-button p-1 text-green-600 hover:bg-green-100 rounded-full transition-colors">
+                                <button title="Süre Uzat" data-username="${escapeHtml(user.iptvUsername)}" class="list-extend-button p-1 text-green-600 hover:bg-green-100 rounded-full transition-colors">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                                 </button>
-                                <button title="Sil" data-username="${user.iptvUsername}" class="list-delete-button p-1 text-red-600 hover:bg-red-100 rounded-full transition-colors">
+                                <button title="Sil" data-username="${escapeHtml(user.iptvUsername)}" class="list-delete-button p-1 text-red-600 hover:bg-red-100 rounded-full transition-colors">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                                 </button>
                             </div>
@@ -6415,62 +6423,6 @@ Keyifli seyirler! 📺`;
             // Grafikleri çiz
             renderRevenueCharts(typeCounts, typeRevenues);
             renderMonthlyChart(monthlyData);
-        }
-
-        // =========================================
-        // ŞUBAT 2026 GEÇMİŞ LOG MİGRASYONU (TEK SEFER)
-        // =========================================
-        async function migrateFebruaryLogs() {
-            try {
-                // Zaten log var mı kontrol et
-                const logsRef = collection(db, `artifacts/${appId}/public/data/subscription_logs`);
-                const existingSnap = await getDocs(logsRef);
-                if (existingSnap.size > 0) {
-                    console.log('Migrasyon: Zaten log mevcut, atlanıyor.');
-                    return;
-                }
-
-                if (eurTryRate === 0) await fetchEurTryRate();
-                const rate = eurTryRate || 38;
-
-                // Şubat 2026'da güncellenen kullanıcılar
-                const februaryUsers = [
-                    { username: '3cjn3RPyvb', userType: 'YURTICI', period: '12 Ay', expiry: '2027-02-19 16:10', logDate: '2026-02-19T16:10:00' },
-                    { username: '5kaFdMha8Z', userType: 'YURTDISI', period: '12 Ay', expiry: '2027-02-17 15:57', logDate: '2026-02-17T15:57:00' },
-                    { username: 'Nbj3sFhF5w', userType: 'YURTICI', period: '12 Ay', expiry: '2027-02-15 14:14', logDate: '2026-02-15T14:14:00' },
-                    { username: 'Zkt3VN35Ar', userType: 'YURTICI', period: '12 Ay', expiry: '2027-02-14 14:41', logDate: '2026-02-14T14:41:00' },
-                    { username: 'DUQFJDka35', userType: 'YURTICI', period: '12 Ay', expiry: '2027-02-11 22:39', logDate: '2026-02-11T22:39:00' },
-                    { username: '32PwXswNjr', userType: 'YURTICI', period: '12 Ay', expiry: '2027-02-09 11:24', logDate: '2026-02-09T11:24:00' },
-                    { username: 'WbHzsf8a2b', userType: 'YURTICI', period: '12 Ay', expiry: '2027-02-09 11:19', logDate: '2026-02-09T11:19:00' },
-                    { username: 'vyMsqqtZT2', userType: 'YURTICI', period: '12 Ay', expiry: '2027-02-05 08:08', logDate: '2026-02-05T08:08:00' },
-                ];
-
-                let count = 0;
-                for (const u of februaryUsers) {
-                    const ci = getUserCreditInfo({ subscriptionPeriod: u.period, userType: u.userType, accountType: '' });
-                    const saleTL = getUserSalePrice({ subscriptionPeriod: u.period, userType: u.userType, accountType: '' }, ci);
-                    const costTL = ci.credit * EUR_PER_CREDIT * rate;
-
-                    await addDoc(logsRef, {
-                        username: u.username,
-                        userType: u.userType,
-                        subscriptionPeriod: u.period,
-                        newExpiryDate: u.expiry,
-                        credits: ci.credit,
-                        saleTL: saleTL,
-                        costTL: costTL,
-                        profitTL: saleTL - costTL,
-                        eurTryRate: rate,
-                        createdAt: u.logDate,
-                        type: 'migration'
-                    });
-                    count++;
-                }
-                console.log(`✅ Migrasyon tamamlandı: ${count} Şubat logu oluşturuldu.`);
-                showMessage(`✅ Şubat 2026 için ${count} abonelik logu oluşturuldu!`, 'success');
-            } catch (err) {
-                console.error('Migrasyon hatası:', err);
-            }
         }
 
         function renderMonthlyTable(monthlyData) {

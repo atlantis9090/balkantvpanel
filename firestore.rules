@@ -12,23 +12,23 @@ service cloud.firestore {
     }
     
     // ===== MAIL KOLEKSİYONU =====
-    // Trigger Email Extension için - herkes yazabilir (talep bildirimleri vs), sadece admin okuyabilir
     match /mail/{document=**} {
       allow create: if isAuthenticated();
       allow read, update, delete: if isAdmin();
     }
     
     // ===== GÜVENLİ KONFİGÜRASYON =====
-    // iyzico API key'leri vs. - sadece Cloud Functions erişebilir (hiçbir client erişemez)
     match /secure_config/{document=**} {
       allow read, write: if false;
     }
 
     // ===== IPTV KULLANICILARI =====
     match /artifacts/{appId}/public/data/iptv_users/{userId} {
-      // Herkes kendi kullanıcı adıyla belge okuyabilir (giriş kontrolü için)
-      allow read: if isAuthenticated();
-      // Kullanıcı kendi belgesini kısmen güncelleyebilir (lastLoginDate, dismissedMessages)
+      // TEKİL OKUMA: Giriş yapan kullanıcı kendi belgesini okuyabilir (login için gerekli)
+      allow get: if isAuthenticated();
+      // LİSTE SORGUSU: Sadece admin tüm kullanıcıları listeleyebilir
+      allow list: if isAdmin();
+      // Kullanıcı kendi belgesini kısmen güncelleyebilir
       allow update: if isAuthenticated() 
         && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['lastLoginDate', 'dismissedMessages']);
@@ -40,8 +40,8 @@ service cloud.firestore {
     
     // ===== YENİLEME TALEPLERİ =====
     match /artifacts/{appId}/public/data/renewal_requests/{requestId} {
-      // Herkes okuyabilir (kendi taleplerini görmek için)
-      allow read: if isAuthenticated();
+      // Okuma sadece admin
+      allow read: if isAdmin();
       // Giriş yapmış kullanıcılar talep oluşturabilir
       allow create: if isAuthenticated();
       // Güncelleme ve silme sadece admin
@@ -50,8 +50,11 @@ service cloud.firestore {
     
     // ===== YENİ HESAP TALEPLERİ =====
     match /artifacts/{appId}/public/data/new_account_requests/{requestId} {
-      allow read: if isAuthenticated();
+      // Okuma sadece admin
+      allow read: if isAdmin();
+      // Giriş yapmış kullanıcılar talep oluşturabilir
       allow create: if isAuthenticated();
+      // Güncelleme ve silme sadece admin
       allow update, delete: if isAdmin();
     }
     
@@ -65,11 +68,16 @@ service cloud.firestore {
 
     // ===== KONUŞMALAR =====
     match /artifacts/{appId}/public/data/conversations/{conversationId} {
-      allow read: if isAuthenticated();
+      // Tekil okuma (kendi konuşması): herkese açık
+      allow get: if isAuthenticated();
+      // Tüm konuşmaları listeleme: sadece admin
+      allow list: if isAdmin();
+      // Oluşturma ve güncelleme: authenticated
       allow create, update: if isAuthenticated();
       allow delete: if isAdmin();
     }
     match /artifacts/{appId}/public/data/conversations/{conversationId}/messages/{messageId} {
+      // Kendi konuşma mesajlarını okuyabilir
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update, delete: if isAdmin();
@@ -77,9 +85,9 @@ service cloud.firestore {
     
     // ===== AYARLAR =====
     match /artifacts/{appId}/public/data/settings/{settingId} {
-      // global ve price_list herkese açık okuma
-      allow read: if isAuthenticated() && settingId in ['global', 'price_list', 'iyzico'];
-      // admin ayarları sadece admin okuyabilir (artık client'tan okunmayacak ama yedek)
+      // global ve price_list herkese açık okuma (iyzico kaldırıldı)
+      allow read: if isAuthenticated() && settingId in ['global', 'price_list'];
+      // admin ayarları sadece admin okuyabilir
       allow read: if isAdmin();
       // Yazma sadece admin
       allow write: if isAdmin();
@@ -87,22 +95,17 @@ service cloud.firestore {
     
     // ===== ÖDEMELER =====
     match /artifacts/{appId}/public/data/payments/{paymentId} {
-      // Kullanıcılar ödeme kaydı oluşturabilir
       allow create: if isAuthenticated();
-      // Okuma ve yönetim sadece admin
       allow read, update, delete: if isAdmin();
     }
 
     // ===== ABONELİK LOGLARI (GELİR/GİDER) =====
     match /artifacts/{appId}/public/data/subscription_logs/{logId} {
-      // Admin tam yetki
+      // Sadece admin tam yetki — kullanıcılar erişemez
       allow read, write: if isAdmin();
-      // Authenticated kullanıcılar log oluşturabilir (süre uzatma vb.)
-      allow create: if isAuthenticated();
     }
 
     // ===== DİĞER TÜM KOLEKSİYONLAR =====
-    // Varsayılan olarak erişim kapalı
     match /{document=**} {
       allow read, write: if false;
     }
